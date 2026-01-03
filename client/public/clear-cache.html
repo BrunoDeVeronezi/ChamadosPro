@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Limpeza de Cache - ChamadosPro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            background: #f0f9ff;
+            border-left: 4px solid #0079F2;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #f0fdf4;
+            border-left-color: #22c55e;
+        }
+        .status.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+        .btn {
+            background: #0079F2;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: #0066D6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,121,242,0.3);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-secondary {
+            background: #6b7280;
+        }
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        .btn-success {
+            background: #22c55e;
+        }
+        .btn-success:hover {
+            background: #16a34a;
+        }
+        .instructions {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .instructions h3 {
+            color: #374151;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            color: #6b7280;
+            line-height: 1.8;
+        }
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        .kbd {
+            background: #e5e7eb;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 30px 0;
+        }
+        #timer {
+            font-size: 48px;
+            font-weight: 700;
+            color: #0079F2;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpeza de Cache</h1>
+        <p class="subtitle">Utilitário para limpar cache do navegador Brave</p>
+
+        <div class="status" id="status">
+            <strong>Status:</strong> Pronto para limpar cache
+        </div>
+
+        <button class="btn" onclick="clearCache()">
+            🗑️ Limpar Cache e Recarregar
+        </button>
+
+        <button class="btn btn-secondary" onclick="hardReload()">
+            ⚡ Recarregar Forçado (Ctrl+Shift+R)
+        </button>
+
+        <button class="btn btn-success" onclick="goToApp()">
+            ✅ Ir para Aplicação
+        </button>
+
+        <div class="divider"></div>
+
+        <div class="instructions">
+            <h3>📖 Instruções para Brave</h3>
+            <ol>
+                <li><strong>Atalho Rápido:</strong> Pressione <span class="kbd">Ctrl+Shift+R</span> (Windows/Linux) ou <span class="kbd">Cmd+Shift+R</span> (Mac) para forçar refresh</li>
+                <li><strong>Limpar Cache Completo:</strong>
+                    <ul style="margin-left: 20px; margin-top: 8px;">
+                        <li>Pressione <span class="kbd">Ctrl+Shift+Delete</span></li>
+                        <li>Selecione "Imagens e arquivos em cache"</li>
+                        <li>Escolha "Todo o período"</li>
+                        <li>Clique em "Limpar dados"</li>
+                    </ul>
+                </li>
+                <li><strong>Desabilitar Cache (Dev):</strong> Abra DevTools (<span class="kbd">F12</span>) → Aba Network → Marque "Disable cache"</li>
+            </ol>
+        </div>
+
+        <div class="instructions" style="margin-top: 15px;">
+            <h3>💡 Dica Pro</h3>
+            <p style="color: #6b7280; line-height: 1.6;">
+                No Brave, você pode usar o modo de navegação privada (<span class="kbd">Ctrl+Shift+N</span>) 
+                para testar a aplicação sem cache. Isso é útil para desenvolvimento!
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function clearCache() {
+            const status = document.getElementById('status');
+            status.className = 'status warning';
+            status.innerHTML = '<strong>⏳ Limpando cache...</strong> Aguarde...';
+
+            // Tenta limpar o cache via Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for (let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
+            }
+
+            // Limpa localStorage
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.log('Storage limpo');
+            }
+
+            // Contador regressivo
+            let count = 3;
+            const timer = setInterval(() => {
+                status.innerHTML = `<strong>⏳ Recarregando em ${count}...</strong>`;
+                count--;
+                if (count < 0) {
+                    clearInterval(timer);
+                    // Força reload com cache bypass
+                    window.location.reload(true);
+                }
+            }, 1000);
+        }
+
+        function hardReload() {
+            // Força reload ignorando cache
+            window.location.href = window.location.href + '?t=' + new Date().getTime();
+        }
+
+        function goToApp() {
+            window.location.href = '/?t=' + new Date().getTime();
+        }
+
+        // Adiciona timestamp na URL automaticamente para evitar cache
+        if (!window.location.search.includes('t=')) {
+            const url = new URL(window.location);
+            url.searchParams.set('t', new Date().getTime());
+            window.history.replaceState({}, '', url);
+        }
+
+        // Detecta se está no Brave
+        if (navigator.brave && typeof navigator.brave.isBrave === 'function') {
+            navigator.brave.isBrave().then(isBrave => {
+                if (isBrave) {
+                    const status = document.getElementById('status');
+                    status.className = 'status success';
+                    status.innerHTML = '<strong>✅ Brave detectado!</strong> Você está usando o navegador certo.';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

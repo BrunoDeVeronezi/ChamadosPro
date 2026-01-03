@@ -1,0 +1,3 @@
+ALTER TABLE services
+  ADD COLUMN IF NOT EXISTS image_url TEXT,
+  ADD COLUMN IF NOT EXISTS billing_unit TEXT;

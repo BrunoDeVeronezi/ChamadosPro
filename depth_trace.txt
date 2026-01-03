@@ -1,0 +1,675 @@
+1 at 1430: <div class="container">
+2 at 1431: <div class="header">
+1 at 1439: </div>
+2 at 1440: <div class="content">
+3 at 1441: <div class="summary-card">
+2 at 1444: </div>
+3 at 1463: <div class="ticket-card">
+4 at 1468: <div class="ticket-info"><strong>💰 Valor:</strong> ${formatCurrency(
+3 at 1470: )}</div>
+2 at 1476: </div>
+3 at 1489: <div class="total-section">
+2 at 1491: </div>
+1 at 1492: </div>
+2 at 1493: <div class="footer">
+1 at 1495: </div>
+0 at 1496: </div>
+1 at 1577: <div class="container">
+2 at 1578: <div class="header">
+1 at 1586: </div>
+2 at 1587: <div class="content">
+3 at 1588: <div class="summary-card">
+2 at 1591: </div>
+3 at 1592: <div class="ticket-card">
+4 at 1597: <div class="ticket-info"><strong>💰 Valor a Receber:</strong> ${formatCurrency(
+3 at 1599: )}</div>
+2 at 1605: </div>
+3 at 1606: <div class="total-section">
+2 at 1608: </div>
+1 at 1609: </div>
+2 at 1610: <div class="footer">
+1 at 1612: </div>
+0 at 1613: </div>
+1 at 3289: <Card
+2 at 3294: <div className='p-4 sm:p-5'>
+3 at 3295: <div className='flex items-center justify-between gap-3 mb-4'>
+4 at 3296: <div className='min-w-0'>
+5 at 3297: <div className='flex items-center gap-2 mb-1'>
+4 at 3306: </div>
+3 at 3310: </div>
+2 at 3314: </div>
+3 at 3316: <div className='grid grid-cols-3 gap-3 mb-4'>
+4 at 3317: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+3 at 3320: </div>
+4 at 3321: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+3 at 3324: </div>
+4 at 3325: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+3 at 3328: </div>
+2 at 3329: </div>
+3 at 3331: <div className='flex items-center justify-between gap-2 mb-4 text-[10px] bg-slate-50 dark:bg-slate-800/30 p-2 rounded-xl border border-slate-300/50 dark:border-slate-800'>
+4 at 3332: <div className='flex flex-col items-center flex-1'>
+3 at 3335: </div>
+4 at 3336: <div className='h-4 w-[1px] bg-slate-200 dark:bg-slate-700' />
+5 at 3337: <div className='flex flex-col items-center flex-1'>
+4 at 3340: </div>
+5 at 3341: <div className='h-4 w-[1px] bg-slate-200 dark:bg-slate-700' />
+6 at 3342: <div className='flex flex-col items-center flex-1'>
+5 at 3345: </div>
+4 at 3346: </div>
+5 at 3348: <div className='flex items-center justify-between mb-4'>
+6 at 3349: <div>
+5 at 3352: </div>
+6 at 3353: <div className='text-right'>
+5 at 3356: </div>
+4 at 3357: </div>
+3 at 3370: </div>
+4 at 3371: <div className='absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8' />
+3 at 3372: </Card>
+4 at 3493: <div className='space-y-6'>
+5 at 3494: <div className='flex items-center justify-between'>
+6 at 3495: <div>
+5 at 3499: </div>
+4 at 3508: </div>
+5 at 3509: <Card>
+6 at 3510: <CardContent className='p-8 text-center'>
+5 at 3516: </Card>
+4 at 3517: </div>
+5 at 3522: <div className='space-y-6'>
+6 at 3523: <div className='flex items-center justify-between'>
+7 at 3524: <div>
+6 at 3531: </div>
+5 at 3540: </div>
+6 at 3542: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+7 at 3550: <Card
+8 at 3554: <CardContent className='p-4'>
+9 at 3555: <div className='flex items-start justify-between mb-3'>
+10 at 3556: <div className='flex-1'>
+9 at 3567: </div>
+8 at 3588: </div>
+9 at 3590: <div className='space-y-2 text-sm mb-3'>
+10 at 3591: <div>
+9 at 3598: </div>
+10 at 3599: <div className='grid grid-cols-3 gap-2 text-xs'>
+11 at 3600: <div>
+10 at 3605: </div>
+11 at 3606: <div>
+10 at 3609: </div>
+11 at 3610: <div>
+10 at 3615: </div>
+9 at 3616: </div>
+10 at 3618: <div>
+9 at 3630: </div>
+8 at 3632: </div>
+7 at 3648: </Card>
+6 at 3651: </div>
+7 at 3654: <AlertDialog
+8 at 3658: <AlertDialogContent>
+9 at 3659: <AlertDialogHeader>
+10 at 3660: <AlertDialogTitle>Receber todos os pagamentos</AlertDialogTitle>
+11 at 3661: <AlertDialogDescription>
+12 at 3674: <AlertDialogFooter>
+13 at 3675: <AlertDialogCancel
+14 at 3680: <AlertDialogAction
+13 at 3691: </AlertDialog>
+12 at 3692: </div>
+13 at 3698: <div className='space-y-6'>
+14 at 3699: <div className='flex items-center justify-between'>
+15 at 3700: <div>
+14 at 3709: </div>
+13 at 3718: </div>
+14 at 3721: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+15 at 3726: <Card
+16 at 3731: <CardContent className='p-4'>
+17 at 3732: <div className='flex items-start justify-between mb-3'>
+18 at 3733: <div className='flex-1'>
+17 at 3740: </div>
+16 at 3742: </div>
+17 at 3744: <div className='space-y-2 text-sm mb-3'>
+18 at 3745: <div className='flex items-center justify-between'>
+17 at 3752: </div>
+18 at 3753: <div className='flex items-center justify-between'>
+17 at 3760: </div>
+18 at 3761: <div className='flex items-center justify-between pt-2 border-t'>
+17 at 3770: </div>
+16 at 3771: </div>
+17 at 3773: <div className='flex gap-2'>
+16 at 3808: </div>
+15 at 3810: </Card>
+14 at 3813: </div>
+15 at 3815: <Card className='border border-slate-300/50 dark:border-slate-800 bg-white dark:bg-card shadow-md'>
+16 at 3816: <CardContent className='p-8 text-center'>
+15 at 3825: </Card>
+16 at 3829: <AlertDialog
+17 at 3833: <AlertDialogContent>
+18 at 3834: <AlertDialogHeader>
+19 at 3835: <AlertDialogTitle>Receber todos os pagamentos</AlertDialogTitle>
+20 at 3836: <AlertDialogDescription>
+21 at 3849: <AlertDialogFooter>
+22 at 3850: <AlertDialogCancel
+23 at 3855: <AlertDialogAction
+22 at 3866: </AlertDialog>
+21 at 3867: </div>
+22 at 3888: <div className='space-y-6'>
+23 at 3889: <div className='flex items-center justify-between'>
+24 at 3890: <div>
+23 at 3894: </div>
+22 at 3903: </div>
+23 at 3904: <Card>
+24 at 3905: <CardContent className='p-8 text-center'>
+23 at 3911: </Card>
+22 at 3912: </div>
+23 at 3917: <div className='space-y-6'>
+24 at 3918: <div className='flex items-center justify-between'>
+25 at 3919: <div>
+24 at 3926: </div>
+23 at 3935: </div>
+24 at 3937: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+25 at 3971: <Card
+26 at 3987: <CardContent className='p-4'>
+27 at 3988: <div className='flex items-start justify-between mb-3'>
+28 at 3989: <div className='flex-1'>
+27 at 4001: </div>
+26 at 4011: </div>
+27 at 4013: <div className='space-y-2 text-sm mb-3'>
+28 at 4014: <div>
+27 at 4027: </div>
+28 at 4028: <div>
+27 at 4041: </div>
+26 at 4042: </div>
+27 at 4044: <div className='space-y-2'>
+28 at 4061: <div className='flex gap-2'>
+27 at 4114: </div>
+26 at 4129: </div>
+25 at 4131: </Card>
+24 at 4135: </div>
+25 at 4138: <AlertDialog
+26 at 4142: <AlertDialogContent>
+27 at 4143: <AlertDialogHeader>
+28 at 4144: <AlertDialogTitle>Receber todos os pagamentos</AlertDialogTitle>
+29 at 4145: <AlertDialogDescription>
+30 at 4161: <AlertDialogFooter>
+31 at 4162: <AlertDialogCancel
+32 at 4167: <AlertDialogAction
+31 at 4178: </AlertDialog>
+32 at 4186: <div className='space-y-4'>
+33 at 4187: <div className='space-y-2'>
+32 at 4206: </div>
+31 at 4207: </div>
+32 at 4208: <div className='flex justify-end gap-2 mt-4'>
+31 at 4233: </div>
+30 at 4236: </div>
+31 at 4242: <div className='space-y-6'>
+32 at 4243: <div className='flex items-center justify-between'>
+33 at 4244: <div>
+32 at 4253: </div>
+31 at 4262: </div>
+32 at 4265: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+33 at 4272: <Card
+34 at 4291: <CardContent className='p-4 overflow-hidden'>
+35 at 4292: <div className='flex items-start justify-between mb-3'>
+36 at 4293: <div className='flex-1 min-w-0'>
+35 at 4300: </div>
+34 at 4306: </div>
+35 at 4308: <div className='space-y-2 text-sm mb-3'>
+36 at 4309: <div className='flex items-center justify-between'>
+35 at 4322: </div>
+34 at 4323: </div>
+35 at 4325: <div className='space-y-2'>
+36 at 4326: <div className='flex gap-2'>
+35 at 4359: </div>
+36 at 4360: <div className='flex gap-2 overflow-hidden'>
+35 at 4411: </div>
+34 at 4412: </div>
+33 at 4414: </Card>
+32 at 4417: </div>
+33 at 4419: <Card className='border border-slate-300/50 dark:border-slate-800 bg-white dark:bg-card shadow-md'>
+34 at 4420: <CardContent className='p-8 text-center'>
+33 at 4429: </Card>
+34 at 4433: <AlertDialog
+35 at 4437: <AlertDialogContent>
+36 at 4438: <AlertDialogHeader>
+37 at 4439: <AlertDialogTitle>Receber todos os pagamentos</AlertDialogTitle>
+38 at 4440: <AlertDialogDescription>
+39 at 4454: <AlertDialogFooter>
+40 at 4455: <AlertDialogCancel
+41 at 4460: <AlertDialogAction
+40 at 4471: </AlertDialog>
+39 at 4472: </div>
+40 at 4479: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+41 at 4480: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+42 at 4481: <div className='space-y-1'>
+41 at 4488: </div>
+40 at 4497: </div>
+41 at 4500: <div className='grid grid-cols-1 gap-4'>
+42 at 4512: <motion.div
+43 at 4523: <div className='flex flex-col md:flex-row items-start md:items-center gap-6'>
+44 at 4524: <div className={cn('p-4 rounded-2xl flex-shrink-0 group-hover:scale-110 transition-transform', bgColor)}>
+43 at 4526: </div>
+44 at 4528: <div className='flex-1 min-w-0'>
+45 at 4529: <div className='flex flex-wrap items-center gap-2 mb-2'>
+44 at 4541: </div>
+43 at 4545: </div>
+44 at 4547: <div className='grid grid-cols-2 sm:grid-cols-3 gap-8 w-full md:w-auto md:border-l border-slate-200 dark:border-slate-800 md:pl-8'>
+45 at 4548: <div>
+44 at 4551: </div>
+45 at 4552: <div>
+44 at 4555: </div>
+45 at 4556: <div className='col-span-2 sm:col-span-1'>
+44 at 4559: </div>
+43 at 4560: </div>
+42 at 4561: </div>
+43 at 4562: <div className='absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+42 at 4563: </motion.div>
+41 at 4566: </div>
+42 at 4568: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+43 at 4569: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+42 at 4571: </div>
+41 at 4574: </div>
+40 at 4576: </div>
+41 at 4583: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+42 at 4584: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+43 at 4585: <div className='space-y-1'>
+42 at 4592: </div>
+41 at 4601: </div>
+42 at 4604: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+43 at 4616: <motion.div
+44 at 4626: <div className='flex items-center justify-between mb-8'>
+45 at 4627: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', bgColor)}>
+44 at 4629: </div>
+45 at 4630: <div className='text-right'>
+44 at 4633: </div>
+43 at 4634: </div>
+44 at 4636: <div className='space-y-1 mb-6'>
+43 at 4641: </div>
+44 at 4643: <div className='pt-6 border-t border-slate-200 dark:border-slate-800'>
+45 at 4644: <div className='flex items-center justify-between text-xs mb-2'>
+44 at 4647: </div>
+45 at 4648: <div className='h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+46 at 4649: <motion.div
+45 at 4655: </div>
+44 at 4656: </div>
+45 at 4657: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+44 at 4658: </motion.div>
+43 at 4661: </div>
+44 at 4663: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+45 at 4664: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+44 at 4666: </div>
+43 at 4669: </div>
+42 at 4671: </div>
+43 at 4678: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+44 at 4679: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+45 at 4680: <div className='space-y-1'>
+44 at 4687: </div>
+43 at 4696: </div>
+44 at 4699: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+45 at 4712: <motion.div
+46 at 4722: <div className='flex items-center justify-between mb-8'>
+47 at 4723: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', colors.bg)}>
+46 at 4725: </div>
+47 at 4726: <div className='text-right'>
+46 at 4729: </div>
+45 at 4730: </div>
+46 at 4732: <div className='space-y-1 mb-6'>
+45 at 4737: </div>
+46 at 4739: <div className='pt-6 border-t border-slate-200 dark:border-slate-800'>
+47 at 4740: <div className='flex items-center justify-between text-xs mb-2'>
+46 at 4743: </div>
+47 at 4744: <div className='h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+48 at 4745: <motion.div
+47 at 4751: </div>
+46 at 4752: </div>
+47 at 4753: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+46 at 4754: </motion.div>
+45 at 4757: </div>
+46 at 4759: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+47 at 4760: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+46 at 4762: </div>
+45 at 4765: </div>
+44 at 4767: </div>
+45 at 4774: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+46 at 4775: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+47 at 4776: <div className='space-y-1'>
+46 at 4783: </div>
+45 at 4792: </div>
+46 at 4795: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+47 at 4806: <motion.div
+48 at 4816: <div className='flex items-center justify-between mb-8'>
+49 at 4817: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', bgColor)}>
+48 at 4819: </div>
+47 at 4821: </div>
+48 at 4823: <div className='space-y-1 mb-8'>
+47 at 4828: </div>
+48 at 4830: <div className='grid grid-cols-2 gap-4 pt-6 border-t border-slate-200 dark:border-slate-800'>
+49 at 4831: <div>
+48 at 4834: </div>
+49 at 4835: <div>
+48 at 4838: </div>
+47 at 4839: </div>
+48 at 4840: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+47 at 4841: </motion.div>
+46 at 4844: </div>
+47 at 4846: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+48 at 4847: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+47 at 4849: </div>
+46 at 4852: </div>
+45 at 4854: </div>
+46 at 4860: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+47 at 4863: <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2'>
+48 at 4864: <div className='space-y-1'>
+47 at 4871: </div>
+48 at 4873: <div className='flex items-center gap-3 w-full sm:w-auto'>
+49 at 4876: <div className='flex items-center gap-2 text-slate-700 dark:text-slate-300'>
+48 at 4881: </div>
+47 at 4895: </div>
+46 at 4896: </div>
+47 at 4899: <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+46 at 4903: </div>
+47 at 4905: <div className='space-y-8'>
+48 at 4907: <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+49 at 4910: <motion.div
+50 at 4916: <div className='flex items-center justify-between mb-4'>
+51 at 4917: <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+50 at 4919: </div>
+49 at 4923: </div>
+50 at 4924: <div>
+51 at 4931: <div className='mt-2 flex items-center gap-1.5'>
+52 at 4932: <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+51 at 4936: </div>
+50 at 4937: </div>
+51 at 4938: <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+50 at 4939: </motion.div>
+51 at 4942: <motion.div
+52 at 4951: <div className='flex items-center justify-between mb-4'>
+53 at 4952: <div className='p-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-amber-50/50 dark:ring-amber-500/5'>
+52 at 4954: </div>
+53 at 4955: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+52 at 4958: </div>
+51 at 4959: </div>
+52 at 4960: <div>
+53 at 4967: <div className='mt-2 flex items-center gap-1.5'>
+54 at 4968: <div className='h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse' />
+53 at 4972: </div>
+52 at 4973: </div>
+53 at 4974: <div className='absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+52 at 4975: </motion.div>
+53 at 4978: <motion.div
+54 at 4984: <div className='flex items-center justify-between mb-4'>
+55 at 4985: <div className='p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-blue-50/50 dark:ring-blue-500/5'>
+54 at 4987: </div>
+55 at 4988: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+54 at 4991: </div>
+53 at 4992: </div>
+54 at 4993: <div>
+55 at 5000: <div className='mt-2 flex items-center gap-1.5'>
+56 at 5001: <div className='h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse' />
+55 at 5005: </div>
+54 at 5006: </div>
+55 at 5007: <div className='absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+54 at 5008: </motion.div>
+55 at 5011: <motion.div
+56 at 5017: <div className='flex items-center justify-between mb-4'>
+57 at 5018: <div className='p-2.5 bg-red-50 dark:bg-red-900/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-red-50/50 dark:ring-red-900/5'>
+56 at 5020: </div>
+55 at 5024: </div>
+56 at 5025: <div>
+57 at 5032: <div className='mt-2 flex items-center gap-1.5'>
+58 at 5033: <div className='h-1.5 w-1.5 rounded-full bg-red-500' />
+57 at 5039: </div>
+56 at 5040: </div>
+57 at 5041: <div className='absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+56 at 5042: </motion.div>
+57 at 5045: <motion.div
+58 at 5051: <div className='flex items-center justify-between mb-4'>
+59 at 5052: <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+58 at 5054: </div>
+59 at 5055: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+58 at 5058: </div>
+57 at 5059: </div>
+58 at 5060: <div>
+59 at 5067: <div className='mt-2 flex items-center gap-1.5'>
+60 at 5068: <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+59 at 5072: </div>
+58 at 5073: </div>
+59 at 5074: <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+58 at 5075: </motion.div>
+59 at 5078: <motion.div
+60 at 5087: <div className='flex items-center justify-between mb-4'>
+61 at 5088: <div className='p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-orange-50/50 dark:ring-orange-500/5'>
+60 at 5090: </div>
+61 at 5091: <div className='flex items-center gap-1 text-orange-500 font-black text-[10px] bg-orange-50/50 dark:bg-orange-500/5 px-1.5 py-0.5 rounded-full'>
+60 at 5094: </div>
+59 at 5095: </div>
+60 at 5096: <div>
+61 at 5103: <div className='mt-2 flex items-center gap-1.5'>
+62 at 5104: <div className='h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse' />
+61 at 5108: </div>
+60 at 5109: </div>
+61 at 5110: <div className='absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+60 at 5111: </motion.div>
+61 at 5114: <motion.div
+62 at 5120: <div className='flex items-center justify-between mb-4'>
+63 at 5121: <div className='p-2.5 bg-primary/5 dark:bg-primary/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-primary/5 dark:ring-primary/5'>
+62 at 5123: </div>
+63 at 5124: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+62 at 5127: </div>
+61 at 5128: </div>
+62 at 5129: <div>
+63 at 5136: <div className='mt-2 flex items-center gap-1.5'>
+64 at 5137: <div className='h-1.5 w-1.5 rounded-full bg-primary animate-pulse' />
+63 at 5141: </div>
+62 at 5142: </div>
+63 at 5143: <div className='absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+62 at 5144: </motion.div>
+61 at 5145: </div>
+62 at 5147: <div className='grid grid-cols-1 lg:grid-cols-12 gap-6'>
+63 at 5149: <div
+64 at 5153: <div className='p-6'>
+65 at 5154: <div className='flex items-center justify-between mb-6'>
+66 at 5155: <div className='space-y-1'>
+65 at 5162: </div>
+66 at 5163: <div className='p-3 bg-primary/5 dark:bg-primary/10 rounded-2xl'>
+65 at 5165: </div>
+64 at 5166: </div>
+65 at 5168: <div className='space-y-4'>
+66 at 5169: <div className='flex items-center justify-between text-xs'>
+65 at 5172: </div>
+66 at 5173: <div className='h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+67 at 5174: <motion.div
+66 at 5180: </div>
+67 at 5181: <div className='grid grid-cols-2 gap-4 pt-2'>
+68 at 5182: <div className='p-3 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+67 at 5185: </div>
+68 at 5186: <div className='p-3 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+67 at 5189: </div>
+66 at 5190: </div>
+65 at 5194: </div>
+64 at 5195: </div>
+63 at 5196: </div>
+64 at 5199: <div
+65 at 5203: <div className='p-6'>
+66 at 5204: <div className='flex items-center justify-between mb-6'>
+67 at 5205: <div className='space-y-1'>
+66 at 5212: </div>
+67 at 5213: <div className='p-3 bg-purple-50 dark:bg-purple-500/10 rounded-2xl'>
+66 at 5215: </div>
+65 at 5216: </div>
+66 at 5218: <div className='space-y-5'>
+67 at 5219: <div className='grid grid-cols-3 gap-3'>
+68 at 5220: <div className='text-center space-y-1'>
+69 at 5221: <div className='h-1.5 w-full bg-blue-500 rounded-full opacity-20' />
+68 at 5224: </div>
+69 at 5225: <div className='text-center space-y-1'>
+70 at 5226: <div className='h-1.5 w-full bg-emerald-500 rounded-full opacity-20' />
+69 at 5229: </div>
+70 at 5230: <div className='text-center space-y-1'>
+71 at 5231: <div className='h-1.5 w-full bg-purple-500 rounded-full opacity-20' />
+70 at 5234: </div>
+69 at 5235: </div>
+70 at 5237: <div className='h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full flex overflow-hidden'>
+71 at 5238: <div
+72 at 5242: <div
+73 at 5246: <div
+72 at 5250: </div>
+71 at 5258: </div>
+70 at 5259: </div>
+69 at 5260: </div>
+70 at 5263: <div
+71 at 5267: <div className='p-6'>
+72 at 5268: <div className='flex items-center justify-between mb-6'>
+73 at 5269: <div className='space-y-1'>
+72 at 5276: </div>
+73 at 5277: <div className='p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl'>
+72 at 5279: </div>
+71 at 5280: </div>
+72 at 5282: <div className='space-y-4'>
+73 at 5283: <div className='flex items-center gap-3 p-3 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-xl border border-slate-300/50 dark:border-slate-800'>
+74 at 5284: <div className='p-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm'>
+73 at 5286: </div>
+74 at 5287: <div>
+73 at 5290: </div>
+72 at 5291: </div>
+73 at 5293: <div className='space-y-2'>
+74 at 5294: <div className='flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500'>
+73 at 5297: </div>
+74 at 5298: <div className='h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+75 at 5299: <div
+74 at 5303: </div>
+73 at 5304: </div>
+72 at 5312: </div>
+71 at 5313: </div>
+70 at 5314: </div>
+69 at 5315: </div>
+70 at 5318: <div className='group relative overflow-hidden rounded-2xl bg-emerald-50/30 dark:bg-slate-900 border border-emerald-100 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300'>
+71 at 5319: <div className='p-6 sm:p-8'>
+72 at 5320: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8'>
+73 at 5321: <div className='flex items-center gap-4'>
+74 at 5322: <div className='p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl'>
+73 at 5324: </div>
+74 at 5325: <div>
+75 at 5330: <div className='flex items-center gap-2 mt-1'>
+74 at 5333: </div>
+73 at 5334: </div>
+72 at 5335: </div>
+73 at 5337: <div className='flex flex-wrap gap-2'>
+72 at 5350: </div>
+71 at 5351: </div>
+72 at 5353: <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+73 at 5354: <div className='relative p-5 rounded-2xl bg-white dark:bg-slate-800/30 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+74 at 5358: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform'>
+73 at 5360: </div>
+72 at 5361: </div>
+73 at 5363: <div className='relative p-5 rounded-2xl bg-white dark:bg-slate-800/30 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+74 at 5367: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform text-red-500'>
+73 at 5369: </div>
+72 at 5370: </div>
+73 at 5372: <div className='relative p-5 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+74 at 5380: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform text-primary'>
+73 at 5382: </div>
+72 at 5383: </div>
+71 at 5384: </div>
+70 at 5385: </div>
+69 at 5386: </div>
+68 at 5387: </div>
+69 at 5392: <Card className='border-primary/20 bg-primary/5'>
+70 at 5393: <CardHeader>
+71 at 5394: <div className='flex items-center justify-between gap-4'>
+72 at 5395: <div className='flex items-center gap-2'>
+73 at 5397: <CardTitle className='text-xl font-semibold'>
+72 at 5400: </div>
+71 at 5408: </div>
+72 at 5410: <CardContent className='space-y-4'>
+73 at 5412: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+72 at 5416: </div>
+73 at 5420: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+74 at 5421: <Card className='hover-elevate'>
+75 at 5422: <CardHeader className='pb-3'>
+76 at 5423: <div className='flex items-center gap-3'>
+77 at 5424: <div className='h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0'>
+76 at 5426: </div>
+75 at 5430: </div>
+76 at 5432: <CardContent>
+75 at 5443: </Card>
+76 at 5445: <Card className='hover-elevate'>
+77 at 5446: <CardHeader className='pb-3'>
+78 at 5447: <div className='flex items-center gap-3'>
+79 at 5448: <div className='h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0'>
+78 at 5450: </div>
+77 at 5454: </div>
+78 at 5456: <CardContent>
+77 at 5467: </Card>
+78 at 5469: <Card className='hover-elevate'>
+79 at 5470: <CardHeader className='pb-3'>
+80 at 5471: <div className='flex items-center gap-3'>
+81 at 5472: <div className='h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0'>
+80 at 5474: </div>
+79 at 5478: </div>
+80 at 5480: <CardContent>
+79 at 5492: </Card>
+78 at 5493: </div>
+79 at 5497: <div className='space-y-3'>
+80 at 5510: <Card key={client.id} className='hover-elevate'>
+81 at 5511: <CardHeader className='pb-2'>
+82 at 5512: <div className='flex items-center justify-between gap-3'>
+83 at 5513: <div className='min-w-0'>
+82 at 5523: </div>
+81 at 5525: </div>
+82 at 5527: <CardContent className='flex flex-col gap-1 text-sm text-muted-foreground'>
+83 at 5528: <div className='flex items-center gap-2'>
+82 at 5535: </div>
+83 at 5536: <div className='flex items-center gap-2'>
+82 at 5545: </div>
+81 at 5547: </Card>
+80 at 5550: </div>
+81 at 5554: <div className='text-center py-12'>
+80 at 5559: </div>
+79 at 5562: </Card>
+80 at 5567: <Card className='border-primary/20 bg-primary/5'>
+81 at 5568: <CardHeader>
+82 at 5569: <div className='flex items-center justify-between gap-4'>
+83 at 5570: <div className='flex items-center gap-2'>
+84 at 5572: <CardTitle className='text-xl font-semibold'>
+83 at 5575: </div>
+82 at 5583: </div>
+83 at 5585: <CardContent>
+84 at 5587: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+83 at 5591: </div>
+84 at 5593: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+85 at 5594: <Card className='hover-elevate'>
+86 at 5595: <CardHeader className='pb-3'>
+87 at 5596: <div className='flex items-center gap-3'>
+88 at 5597: <div className='h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0'>
+87 at 5599: </div>
+86 at 5603: </div>
+87 at 5605: <CardContent>
+86 at 5616: </Card>
+87 at 5618: <Card className='hover-elevate'>
+88 at 5619: <CardHeader className='pb-3'>
+89 at 5620: <div className='flex items-center gap-3'>
+90 at 5621: <div className='h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0'>
+89 at 5623: </div>
+88 at 5627: </div>
+89 at 5629: <CardContent>
+88 at 5640: </Card>
+89 at 5642: <Card className='hover-elevate'>
+90 at 5643: <CardHeader className='pb-3'>
+91 at 5644: <div className='flex items-center gap-3'>
+92 at 5645: <div className='h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0'>
+91 at 5647: </div>
+90 at 5651: </div>
+91 at 5653: <CardContent>
+90 at 5664: </Card>
+89 at 5665: </div>
+90 at 5667: <div className='text-center py-12'>
+89 at 5672: </div>
+88 at 5675: </Card>
+87 at 5773: </div>
+88 at 5879: <form onSubmit={handleSubmit} className='space-y-4'>
+89 at 5880: <div className='space-y-2'>
+88 at 5898: </div>
+89 at 5900: <div className='space-y-2'>
+88 at 5917: </div>
+89 at 5919: <div className='space-y-2'>
+88 at 5932: </div>
+89 at 5934: <div className='flex justify-end gap-2 pt-4'>
+88 at 5951: </div>
+87 at 5952: </form>

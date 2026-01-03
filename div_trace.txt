@@ -1,0 +1,593 @@
+OPEN: 1430: <div class="container">
+OPEN: 1431: <div class="header">
+CLOSE: 1439: </div>
+OPEN: 1440: <div class="content">
+OPEN: 1441: <div class="summary-card">
+CLOSE: 1444: </div>
+OPEN: 1463: <div class="ticket-card">
+OPEN: 1464: <div class="ticket-header">📋 Chamado ${index + 1}</div>
+CLOSE: 1464: <div class="ticket-header">📋 Chamado ${index + 1}</div>
+OPEN: 1465: <div class="ticket-info"><strong>🔢 Número:</strong> ${ticketNumber}</div>
+CLOSE: 1465: <div class="ticket-info"><strong>🔢 Número:</strong> ${ticketNumber}</div>
+OPEN: 1466: <div class="ticket-info"><strong>🛠️ Serviço:</strong> ${serviceName}</div>
+CLOSE: 1466: <div class="ticket-info"><strong>🛠️ Serviço:</strong> ${serviceName}</div>
+OPEN: 1467: <div class="ticket-info"><strong>📅 Data de Atendimento:</strong> ${attendanceDate}</div>
+CLOSE: 1467: <div class="ticket-info"><strong>📅 Data de Atendimento:</strong> ${attendanceDate}</div>
+OPEN: 1468: <div class="ticket-info"><strong>💰 Valor:</strong> ${formatCurrency(
+CLOSE: 1470: )}</div>
+OPEN: 1473: ? `<div class="ticket-info"><strong>🔗 Link de Pagamento:</strong> <a href="${paymentLink}">${paymentLink}</a></div>`
+CLOSE: 1473: ? `<div class="ticket-info"><strong>🔗 Link de Pagamento:</strong> <a href="${paymentLink}">${paymentLink}</a></div>`
+CLOSE: 1476: </div>
+OPEN: 1489: <div class="total-section">
+CLOSE: 1491: </div>
+CLOSE: 1492: </div>
+OPEN: 1493: <div class="footer">
+CLOSE: 1495: </div>
+CLOSE: 1496: </div>
+OPEN: 1577: <div class="container">
+OPEN: 1578: <div class="header">
+CLOSE: 1586: </div>
+OPEN: 1587: <div class="content">
+OPEN: 1588: <div class="summary-card">
+CLOSE: 1591: </div>
+OPEN: 1592: <div class="ticket-card">
+OPEN: 1593: <div class="ticket-header">📋 Detalhes do Chamado</div>
+CLOSE: 1593: <div class="ticket-header">📋 Detalhes do Chamado</div>
+OPEN: 1594: <div class="ticket-info"><strong>🔢 Número:</strong> ${ticketNumber}</div>
+CLOSE: 1594: <div class="ticket-info"><strong>🔢 Número:</strong> ${ticketNumber}</div>
+OPEN: 1595: <div class="ticket-info"><strong>🛠️ Serviço:</strong> ${serviceName}</div>
+CLOSE: 1595: <div class="ticket-info"><strong>🛠️ Serviço:</strong> ${serviceName}</div>
+OPEN: 1596: <div class="ticket-info"><strong>📅 Data de Atendimento:</strong> ${attendanceDate}</div>
+CLOSE: 1596: <div class="ticket-info"><strong>📅 Data de Atendimento:</strong> ${attendanceDate}</div>
+OPEN: 1597: <div class="ticket-info"><strong>💰 Valor a Receber:</strong> ${formatCurrency(
+CLOSE: 1599: )}</div>
+OPEN: 1602: ? `<div class="ticket-info"><strong>🔗 Link de Pagamento:</strong> <a href="${paymentLink}">${paymentLink}</a></div>`
+CLOSE: 1602: ? `<div class="ticket-info"><strong>🔗 Link de Pagamento:</strong> <a href="${paymentLink}">${paymentLink}</a></div>`
+CLOSE: 1605: </div>
+OPEN: 1606: <div class="total-section">
+CLOSE: 1608: </div>
+CLOSE: 1609: </div>
+OPEN: 1610: <div class="footer">
+CLOSE: 1612: </div>
+CLOSE: 1613: </div>
+OPEN: 3294: <div className='p-4 sm:p-5'>
+OPEN: 3295: <div className='flex items-center justify-between gap-3 mb-4'>
+OPEN: 3296: <div className='min-w-0'>
+OPEN: 3297: <div className='flex items-center gap-2 mb-1'>
+CLOSE: 3306: </div>
+CLOSE: 3310: </div>
+CLOSE: 3314: </div>
+OPEN: 3316: <div className='grid grid-cols-3 gap-3 mb-4'>
+OPEN: 3317: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+CLOSE: 3320: </div>
+OPEN: 3321: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+CLOSE: 3324: </div>
+OPEN: 3325: <div className='p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+CLOSE: 3328: </div>
+CLOSE: 3329: </div>
+OPEN: 3331: <div className='flex items-center justify-between gap-2 mb-4 text-[10px] bg-slate-50 dark:bg-slate-800/30 p-2 rounded-xl border border-slate-300/50 dark:border-slate-800'>
+OPEN: 3332: <div className='flex flex-col items-center flex-1'>
+CLOSE: 3335: </div>
+OPEN: 3336: <div className='h-4 w-[1px] bg-slate-200 dark:bg-slate-700' />
+OPEN: 3337: <div className='flex flex-col items-center flex-1'>
+CLOSE: 3340: </div>
+OPEN: 3341: <div className='h-4 w-[1px] bg-slate-200 dark:bg-slate-700' />
+OPEN: 3342: <div className='flex flex-col items-center flex-1'>
+CLOSE: 3345: </div>
+CLOSE: 3346: </div>
+OPEN: 3348: <div className='flex items-center justify-between mb-4'>
+OPEN: 3349: <div>
+CLOSE: 3352: </div>
+OPEN: 3353: <div className='text-right'>
+CLOSE: 3356: </div>
+CLOSE: 3357: </div>
+CLOSE: 3370: </div>
+OPEN: 3371: <div className='absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8' />
+OPEN: 3493: <div className='space-y-6'>
+OPEN: 3494: <div className='flex items-center justify-between'>
+OPEN: 3495: <div>
+CLOSE: 3499: </div>
+CLOSE: 3508: </div>
+CLOSE: 3517: </div>
+OPEN: 3522: <div className='space-y-6'>
+OPEN: 3523: <div className='flex items-center justify-between'>
+OPEN: 3524: <div>
+CLOSE: 3531: </div>
+CLOSE: 3540: </div>
+OPEN: 3542: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+OPEN: 3555: <div className='flex items-start justify-between mb-3'>
+OPEN: 3556: <div className='flex-1'>
+CLOSE: 3567: </div>
+CLOSE: 3588: </div>
+OPEN: 3590: <div className='space-y-2 text-sm mb-3'>
+OPEN: 3591: <div>
+CLOSE: 3598: </div>
+OPEN: 3599: <div className='grid grid-cols-3 gap-2 text-xs'>
+OPEN: 3600: <div>
+CLOSE: 3605: </div>
+OPEN: 3606: <div>
+CLOSE: 3609: </div>
+OPEN: 3610: <div>
+CLOSE: 3615: </div>
+CLOSE: 3616: </div>
+OPEN: 3618: <div>
+CLOSE: 3630: </div>
+CLOSE: 3632: </div>
+CLOSE: 3651: </div>
+CLOSE: 3692: </div>
+OPEN: 3698: <div className='space-y-6'>
+OPEN: 3699: <div className='flex items-center justify-between'>
+OPEN: 3700: <div>
+CLOSE: 3709: </div>
+CLOSE: 3718: </div>
+OPEN: 3721: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+OPEN: 3732: <div className='flex items-start justify-between mb-3'>
+OPEN: 3733: <div className='flex-1'>
+CLOSE: 3740: </div>
+CLOSE: 3742: </div>
+OPEN: 3744: <div className='space-y-2 text-sm mb-3'>
+OPEN: 3745: <div className='flex items-center justify-between'>
+CLOSE: 3752: </div>
+OPEN: 3753: <div className='flex items-center justify-between'>
+CLOSE: 3760: </div>
+OPEN: 3761: <div className='flex items-center justify-between pt-2 border-t'>
+CLOSE: 3770: </div>
+CLOSE: 3771: </div>
+OPEN: 3773: <div className='flex gap-2'>
+CLOSE: 3808: </div>
+CLOSE: 3813: </div>
+CLOSE: 3867: </div>
+OPEN: 3888: <div className='space-y-6'>
+OPEN: 3889: <div className='flex items-center justify-between'>
+OPEN: 3890: <div>
+CLOSE: 3894: </div>
+CLOSE: 3903: </div>
+CLOSE: 3912: </div>
+OPEN: 3917: <div className='space-y-6'>
+OPEN: 3918: <div className='flex items-center justify-between'>
+OPEN: 3919: <div>
+CLOSE: 3926: </div>
+CLOSE: 3935: </div>
+OPEN: 3937: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+OPEN: 3988: <div className='flex items-start justify-between mb-3'>
+OPEN: 3989: <div className='flex-1'>
+CLOSE: 4001: </div>
+CLOSE: 4011: </div>
+OPEN: 4013: <div className='space-y-2 text-sm mb-3'>
+OPEN: 4014: <div>
+CLOSE: 4027: </div>
+OPEN: 4028: <div>
+CLOSE: 4041: </div>
+CLOSE: 4042: </div>
+OPEN: 4044: <div className='space-y-2'>
+OPEN: 4061: <div className='flex gap-2'>
+CLOSE: 4114: </div>
+CLOSE: 4129: </div>
+CLOSE: 4135: </div>
+OPEN: 4186: <div className='space-y-4'>
+OPEN: 4187: <div className='space-y-2'>
+CLOSE: 4206: </div>
+CLOSE: 4207: </div>
+OPEN: 4208: <div className='flex justify-end gap-2 mt-4'>
+CLOSE: 4233: </div>
+CLOSE: 4236: </div>
+OPEN: 4242: <div className='space-y-6'>
+OPEN: 4243: <div className='flex items-center justify-between'>
+OPEN: 4244: <div>
+CLOSE: 4253: </div>
+CLOSE: 4262: </div>
+OPEN: 4265: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+OPEN: 4292: <div className='flex items-start justify-between mb-3'>
+OPEN: 4293: <div className='flex-1 min-w-0'>
+CLOSE: 4300: </div>
+CLOSE: 4306: </div>
+OPEN: 4308: <div className='space-y-2 text-sm mb-3'>
+OPEN: 4309: <div className='flex items-center justify-between'>
+CLOSE: 4322: </div>
+CLOSE: 4323: </div>
+OPEN: 4325: <div className='space-y-2'>
+OPEN: 4326: <div className='flex gap-2'>
+CLOSE: 4359: </div>
+OPEN: 4360: <div className='flex gap-2 overflow-hidden'>
+CLOSE: 4411: </div>
+CLOSE: 4412: </div>
+CLOSE: 4417: </div>
+CLOSE: 4472: </div>
+OPEN: 4479: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+OPEN: 4480: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+OPEN: 4481: <div className='space-y-1'>
+CLOSE: 4488: </div>
+CLOSE: 4497: </div>
+OPEN: 4500: <div className='grid grid-cols-1 gap-4'>
+OPEN: 4512: <motion.div
+OPEN: 4523: <div className='flex flex-col md:flex-row items-start md:items-center gap-6'>
+OPEN: 4524: <div className={cn('p-4 rounded-2xl flex-shrink-0 group-hover:scale-110 transition-transform', bgColor)}>
+CLOSE: 4526: </div>
+OPEN: 4528: <div className='flex-1 min-w-0'>
+OPEN: 4529: <div className='flex flex-wrap items-center gap-2 mb-2'>
+CLOSE: 4541: </div>
+CLOSE: 4545: </div>
+OPEN: 4547: <div className='grid grid-cols-2 sm:grid-cols-3 gap-8 w-full md:w-auto md:border-l border-slate-200 dark:border-slate-800 md:pl-8'>
+OPEN: 4548: <div>
+CLOSE: 4551: </div>
+OPEN: 4552: <div>
+CLOSE: 4555: </div>
+OPEN: 4556: <div className='col-span-2 sm:col-span-1'>
+CLOSE: 4559: </div>
+CLOSE: 4560: </div>
+CLOSE: 4561: </div>
+OPEN: 4562: <div className='absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4563: </motion.div>
+CLOSE: 4566: </div>
+OPEN: 4568: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+OPEN: 4569: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+CLOSE: 4571: </div>
+CLOSE: 4574: </div>
+CLOSE: 4576: </div>
+OPEN: 4583: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+OPEN: 4584: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+OPEN: 4585: <div className='space-y-1'>
+CLOSE: 4592: </div>
+CLOSE: 4601: </div>
+OPEN: 4604: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+OPEN: 4616: <motion.div
+OPEN: 4626: <div className='flex items-center justify-between mb-8'>
+OPEN: 4627: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', bgColor)}>
+CLOSE: 4629: </div>
+OPEN: 4630: <div className='text-right'>
+CLOSE: 4633: </div>
+CLOSE: 4634: </div>
+OPEN: 4636: <div className='space-y-1 mb-6'>
+CLOSE: 4641: </div>
+OPEN: 4643: <div className='pt-6 border-t border-slate-200 dark:border-slate-800'>
+OPEN: 4644: <div className='flex items-center justify-between text-xs mb-2'>
+CLOSE: 4647: </div>
+OPEN: 4648: <div className='h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+OPEN: 4649: <motion.div
+CLOSE: 4655: </div>
+CLOSE: 4656: </div>
+OPEN: 4657: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4658: </motion.div>
+CLOSE: 4661: </div>
+OPEN: 4663: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+OPEN: 4664: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+CLOSE: 4666: </div>
+CLOSE: 4669: </div>
+CLOSE: 4671: </div>
+OPEN: 4678: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+OPEN: 4679: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+OPEN: 4680: <div className='space-y-1'>
+CLOSE: 4687: </div>
+CLOSE: 4696: </div>
+OPEN: 4699: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+OPEN: 4712: <motion.div
+OPEN: 4722: <div className='flex items-center justify-between mb-8'>
+OPEN: 4723: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', colors.bg)}>
+CLOSE: 4725: </div>
+OPEN: 4726: <div className='text-right'>
+CLOSE: 4729: </div>
+CLOSE: 4730: </div>
+OPEN: 4732: <div className='space-y-1 mb-6'>
+CLOSE: 4737: </div>
+OPEN: 4739: <div className='pt-6 border-t border-slate-200 dark:border-slate-800'>
+OPEN: 4740: <div className='flex items-center justify-between text-xs mb-2'>
+CLOSE: 4743: </div>
+OPEN: 4744: <div className='h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+OPEN: 4745: <motion.div
+CLOSE: 4751: </div>
+CLOSE: 4752: </div>
+OPEN: 4753: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4754: </motion.div>
+CLOSE: 4757: </div>
+OPEN: 4759: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+OPEN: 4760: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+CLOSE: 4762: </div>
+CLOSE: 4765: </div>
+CLOSE: 4767: </div>
+OPEN: 4774: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+OPEN: 4775: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+OPEN: 4776: <div className='space-y-1'>
+CLOSE: 4783: </div>
+CLOSE: 4792: </div>
+OPEN: 4795: <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+OPEN: 4806: <motion.div
+OPEN: 4816: <div className='flex items-center justify-between mb-8'>
+OPEN: 4817: <div className={cn('p-4 rounded-2xl group-hover:scale-110 transition-transform', bgColor)}>
+CLOSE: 4819: </div>
+CLOSE: 4821: </div>
+OPEN: 4823: <div className='space-y-1 mb-8'>
+CLOSE: 4828: </div>
+OPEN: 4830: <div className='grid grid-cols-2 gap-4 pt-6 border-t border-slate-200 dark:border-slate-800'>
+OPEN: 4831: <div>
+CLOSE: 4834: </div>
+OPEN: 4835: <div>
+CLOSE: 4838: </div>
+CLOSE: 4839: </div>
+OPEN: 4840: <div className='absolute bottom-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-8 -mb-8 opacity-50 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4841: </motion.div>
+CLOSE: 4844: </div>
+OPEN: 4846: <div className='flex flex-col items-center justify-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-300/50 dark:border-slate-800 shadow-sm'>
+OPEN: 4847: <div className='p-6 bg-slate-50 dark:bg-slate-800/50 rounded-full mb-6'>
+CLOSE: 4849: </div>
+CLOSE: 4852: </div>
+CLOSE: 4854: </div>
+OPEN: 4859: <div className='space-y-8 p-4 sm:p-6 bg-slate-50 dark:bg-[#0b1120] min-h-screen'>
+OPEN: 4862: <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2'>
+OPEN: 4863: <div className='space-y-1'>
+CLOSE: 4870: </div>
+OPEN: 4872: <div className='flex items-center gap-3 w-full sm:w-auto'>
+OPEN: 4875: <div className='flex items-center gap-2 text-slate-700 dark:text-slate-300'>
+CLOSE: 4880: </div>
+CLOSE: 4894: </div>
+CLOSE: 4895: </div>
+OPEN: 4898: <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+CLOSE: 4902: </div>
+OPEN: 4904: <div className='space-y-8'>
+OPEN: 4906: <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+OPEN: 4909: <motion.div
+OPEN: 4915: <div className='flex items-center justify-between mb-4'>
+OPEN: 4916: <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+CLOSE: 4918: </div>
+CLOSE: 4922: </div>
+OPEN: 4923: <div>
+OPEN: 4930: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 4931: <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+CLOSE: 4935: </div>
+CLOSE: 4936: </div>
+OPEN: 4937: <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4938: </motion.div>
+OPEN: 4941: <motion.div
+OPEN: 4950: <div className='flex items-center justify-between mb-4'>
+OPEN: 4951: <div className='p-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-amber-50/50 dark:ring-amber-500/5'>
+CLOSE: 4953: </div>
+OPEN: 4954: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+CLOSE: 4957: </div>
+CLOSE: 4958: </div>
+OPEN: 4959: <div>
+OPEN: 4966: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 4967: <div className='h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse' />
+CLOSE: 4971: </div>
+CLOSE: 4972: </div>
+OPEN: 4973: <div className='absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 4974: </motion.div>
+OPEN: 4977: <motion.div
+OPEN: 4983: <div className='flex items-center justify-between mb-4'>
+OPEN: 4984: <div className='p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-blue-50/50 dark:ring-blue-500/5'>
+CLOSE: 4986: </div>
+OPEN: 4987: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+CLOSE: 4990: </div>
+CLOSE: 4991: </div>
+OPEN: 4992: <div>
+OPEN: 4999: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 5000: <div className='h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse' />
+CLOSE: 5004: </div>
+CLOSE: 5005: </div>
+OPEN: 5006: <div className='absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 5007: </motion.div>
+OPEN: 5010: <motion.div
+OPEN: 5016: <div className='flex items-center justify-between mb-4'>
+OPEN: 5017: <div className='p-2.5 bg-red-50 dark:bg-red-900/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-red-50/50 dark:ring-red-900/5'>
+CLOSE: 5019: </div>
+CLOSE: 5023: </div>
+OPEN: 5024: <div>
+OPEN: 5031: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 5032: <div className='h-1.5 w-1.5 rounded-full bg-red-500' />
+CLOSE: 5038: </div>
+CLOSE: 5039: </div>
+OPEN: 5040: <div className='absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 5041: </motion.div>
+OPEN: 5044: <motion.div
+OPEN: 5050: <div className='flex items-center justify-between mb-4'>
+OPEN: 5051: <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+CLOSE: 5053: </div>
+OPEN: 5054: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+CLOSE: 5057: </div>
+CLOSE: 5058: </div>
+OPEN: 5059: <div>
+OPEN: 5066: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 5067: <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+CLOSE: 5071: </div>
+CLOSE: 5072: </div>
+OPEN: 5073: <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 5074: </motion.div>
+OPEN: 5077: <motion.div
+OPEN: 5086: <div className='flex items-center justify-between mb-4'>
+OPEN: 5087: <div className='p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-orange-50/50 dark:ring-orange-500/5'>
+CLOSE: 5089: </div>
+OPEN: 5090: <div className='flex items-center gap-1 text-orange-500 font-black text-[10px] bg-orange-50/50 dark:bg-orange-500/5 px-1.5 py-0.5 rounded-full'>
+CLOSE: 5093: </div>
+CLOSE: 5094: </div>
+OPEN: 5095: <div>
+OPEN: 5102: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 5103: <div className='h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse' />
+CLOSE: 5107: </div>
+CLOSE: 5108: </div>
+OPEN: 5109: <div className='absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 5110: </motion.div>
+OPEN: 5113: <motion.div
+OPEN: 5119: <div className='flex items-center justify-between mb-4'>
+OPEN: 5120: <div className='p-2.5 bg-primary/5 dark:bg-primary/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-primary/5 dark:ring-primary/5'>
+CLOSE: 5122: </div>
+OPEN: 5123: <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+CLOSE: 5126: </div>
+CLOSE: 5127: </div>
+OPEN: 5128: <div>
+OPEN: 5135: <div className='mt-2 flex items-center gap-1.5'>
+OPEN: 5136: <div className='h-1.5 w-1.5 rounded-full bg-primary animate-pulse' />
+CLOSE: 5140: </div>
+CLOSE: 5141: </div>
+OPEN: 5142: <div className='absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+CLOSE: 5143: </motion.div>
+CLOSE: 5144: </div>
+OPEN: 5146: <div className='grid grid-cols-1 lg:grid-cols-12 gap-6'>
+OPEN: 5148: <div
+OPEN: 5152: <div className='p-6'>
+OPEN: 5153: <div className='flex items-center justify-between mb-6'>
+OPEN: 5154: <div className='space-y-1'>
+CLOSE: 5161: </div>
+OPEN: 5162: <div className='p-3 bg-primary/5 dark:bg-primary/10 rounded-2xl'>
+CLOSE: 5164: </div>
+CLOSE: 5165: </div>
+OPEN: 5167: <div className='space-y-4'>
+OPEN: 5168: <div className='flex items-center justify-between text-xs'>
+CLOSE: 5171: </div>
+OPEN: 5172: <div className='h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+OPEN: 5173: <motion.div
+CLOSE: 5179: </div>
+OPEN: 5180: <div className='grid grid-cols-2 gap-4 pt-2'>
+OPEN: 5181: <div className='p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+CLOSE: 5184: </div>
+OPEN: 5185: <div className='p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50'>
+CLOSE: 5188: </div>
+CLOSE: 5189: </div>
+CLOSE: 5193: </div>
+CLOSE: 5194: </div>
+CLOSE: 5195: </div>
+OPEN: 5198: <div
+OPEN: 5202: <div className='p-6'>
+OPEN: 5203: <div className='flex items-center justify-between mb-6'>
+OPEN: 5204: <div className='space-y-1'>
+CLOSE: 5211: </div>
+OPEN: 5212: <div className='p-3 bg-purple-50 dark:bg-purple-500/10 rounded-2xl'>
+CLOSE: 5214: </div>
+CLOSE: 5215: </div>
+OPEN: 5217: <div className='space-y-5'>
+OPEN: 5218: <div className='grid grid-cols-3 gap-3'>
+OPEN: 5219: <div className='text-center space-y-1'>
+OPEN: 5220: <div className='h-1.5 w-full bg-blue-500 rounded-full opacity-20' />
+CLOSE: 5223: </div>
+OPEN: 5224: <div className='text-center space-y-1'>
+OPEN: 5225: <div className='h-1.5 w-full bg-emerald-500 rounded-full opacity-20' />
+CLOSE: 5228: </div>
+OPEN: 5229: <div className='text-center space-y-1'>
+OPEN: 5230: <div className='h-1.5 w-full bg-purple-500 rounded-full opacity-20' />
+CLOSE: 5233: </div>
+CLOSE: 5234: </div>
+OPEN: 5236: <div className='h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full flex overflow-hidden'>
+OPEN: 5237: <div
+OPEN: 5241: <div
+OPEN: 5245: <div
+CLOSE: 5249: </div>
+CLOSE: 5257: </div>
+CLOSE: 5258: </div>
+CLOSE: 5259: </div>
+OPEN: 5262: <div
+OPEN: 5266: <div className='p-6'>
+OPEN: 5267: <div className='flex items-center justify-between mb-6'>
+OPEN: 5268: <div className='space-y-1'>
+CLOSE: 5275: </div>
+OPEN: 5276: <div className='p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl'>
+CLOSE: 5278: </div>
+CLOSE: 5279: </div>
+OPEN: 5281: <div className='space-y-4'>
+OPEN: 5282: <div className='flex items-center gap-3 p-3 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-xl border border-slate-300/50 dark:border-slate-800'>
+OPEN: 5283: <div className='p-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm'>
+CLOSE: 5285: </div>
+OPEN: 5286: <div>
+CLOSE: 5289: </div>
+CLOSE: 5290: </div>
+OPEN: 5292: <div className='space-y-2'>
+OPEN: 5293: <div className='flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500'>
+CLOSE: 5296: </div>
+OPEN: 5297: <div className='h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden'>
+OPEN: 5298: <div
+CLOSE: 5302: </div>
+CLOSE: 5303: </div>
+CLOSE: 5311: </div>
+CLOSE: 5312: </div>
+CLOSE: 5313: </div>
+CLOSE: 5314: </div>
+OPEN: 5317: <div className='group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-300/50 dark:border-slate-800 shadow-md hover:shadow-lg transition-all duration-300'>
+OPEN: 5318: <div className='p-6 sm:p-8'>
+OPEN: 5319: <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8'>
+OPEN: 5320: <div className='flex items-center gap-4'>
+OPEN: 5321: <div className='p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl'>
+CLOSE: 5323: </div>
+OPEN: 5324: <div>
+OPEN: 5329: <div className='flex items-center gap-2 mt-1'>
+CLOSE: 5332: </div>
+CLOSE: 5333: </div>
+CLOSE: 5334: </div>
+OPEN: 5336: <div className='flex flex-wrap gap-2'>
+CLOSE: 5349: </div>
+CLOSE: 5350: </div>
+OPEN: 5352: <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+OPEN: 5353: <div className='relative p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+OPEN: 5357: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform'>
+CLOSE: 5359: </div>
+CLOSE: 5360: </div>
+OPEN: 5362: <div className='relative p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+OPEN: 5366: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform text-red-500'>
+CLOSE: 5368: </div>
+CLOSE: 5369: </div>
+OPEN: 5371: <div className='relative p-5 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-slate-300/50 dark:border-slate-800 group/item overflow-hidden'>
+OPEN: 5379: <div className='absolute -bottom-4 -right-4 opacity-5 group-hover/item:scale-125 transition-transform text-primary'>
+CLOSE: 5381: </div>
+CLOSE: 5382: </div>
+CLOSE: 5383: </div>
+CLOSE: 5384: </div>
+CLOSE: 5385: </div>
+CLOSE: 5386: </div>
+OPEN: 5393: <div className='flex items-center justify-between gap-4'>
+OPEN: 5394: <div className='flex items-center gap-2'>
+CLOSE: 5399: </div>
+CLOSE: 5407: </div>
+OPEN: 5411: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+CLOSE: 5415: </div>
+OPEN: 5419: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+OPEN: 5422: <div className='flex items-center gap-3'>
+OPEN: 5423: <div className='h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5425: </div>
+CLOSE: 5429: </div>
+OPEN: 5446: <div className='flex items-center gap-3'>
+OPEN: 5447: <div className='h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5449: </div>
+CLOSE: 5453: </div>
+OPEN: 5470: <div className='flex items-center gap-3'>
+OPEN: 5471: <div className='h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5473: </div>
+CLOSE: 5477: </div>
+CLOSE: 5492: </div>
+OPEN: 5496: <div className='space-y-3'>
+OPEN: 5511: <div className='flex items-center justify-between gap-3'>
+OPEN: 5512: <div className='min-w-0'>
+CLOSE: 5522: </div>
+CLOSE: 5524: </div>
+OPEN: 5527: <div className='flex items-center gap-2'>
+CLOSE: 5534: </div>
+OPEN: 5535: <div className='flex items-center gap-2'>
+CLOSE: 5544: </div>
+CLOSE: 5549: </div>
+OPEN: 5553: <div className='text-center py-12'>
+CLOSE: 5558: </div>
+OPEN: 5568: <div className='flex items-center justify-between gap-4'>
+OPEN: 5569: <div className='flex items-center gap-2'>
+CLOSE: 5574: </div>
+CLOSE: 5582: </div>
+OPEN: 5586: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+CLOSE: 5590: </div>
+OPEN: 5592: <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+OPEN: 5595: <div className='flex items-center gap-3'>
+OPEN: 5596: <div className='h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5598: </div>
+CLOSE: 5602: </div>
+OPEN: 5619: <div className='flex items-center gap-3'>
+OPEN: 5620: <div className='h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5622: </div>
+CLOSE: 5626: </div>
+OPEN: 5643: <div className='flex items-center gap-3'>
+OPEN: 5644: <div className='h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0'>
+CLOSE: 5646: </div>
+CLOSE: 5650: </div>
+CLOSE: 5664: </div>
+OPEN: 5666: <div className='text-center py-12'>
+CLOSE: 5671: </div>
+CLOSE: 5772: </div>
+OPEN: 5879: <div className='space-y-2'>
+CLOSE: 5897: </div>
+OPEN: 5899: <div className='space-y-2'>
+CLOSE: 5916: </div>
+OPEN: 5918: <div className='space-y-2'>
+CLOSE: 5931: </div>
+OPEN: 5933: <div className='flex justify-end gap-2 pt-4'>
+CLOSE: 5950: </div>

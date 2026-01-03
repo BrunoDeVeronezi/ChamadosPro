@@ -1,0 +1,2 @@
+ALTER TABLE services
+  ADD COLUMN IF NOT EXISTS warranty TEXT;
