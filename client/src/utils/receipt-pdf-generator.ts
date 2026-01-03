@@ -22,6 +22,7 @@ interface ReceiptData {
     date: string;
     amount: number;
     discount?: number;
+    kmChargeExempt?: boolean;
     kmTotal?: number;
     kmRate?: number;
     extraExpenses?: number;
@@ -129,6 +130,7 @@ export const generateReceiptPDF = async (data: ReceiptData) => {
   const kmTotal = Number(data.ticket.kmTotal ?? 0);
   const kmRate = Number(data.ticket.kmRate ?? 0);
   const extraExpenses = Number(data.ticket.extraExpenses ?? 0);
+  const isKmChargeExempt = Boolean(data.ticket.kmChargeExempt);
   const kmValue = kmTotal * kmRate;
   const hasKmItem = rawServiceItems.some((item) => {
     const name = String(item.name || '').toLowerCase();
@@ -141,7 +143,7 @@ export const generateReceiptPDF = async (data: ReceiptData) => {
     );
   });
   const extraServiceItems: Array<{ name: string; amount: number }> = [];
-  if (kmValue > 0 && !hasKmItem) {
+  if (kmValue > 0 && !hasKmItem && !isKmChargeExempt) {
     extraServiceItems.push({
       name: `Deslocamento (${kmTotal} km x ${formatCurrency(kmRate)})`,
       amount: kmValue,

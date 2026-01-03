@@ -1437,6 +1437,8 @@ export default function Dashboard() {
 
         kmRate?: number;
 
+        kmChargeExempt?: boolean;
+
         additionalHourRate?: number;
 
         extraExpenses: number;
@@ -1464,6 +1466,8 @@ export default function Dashboard() {
         kmTotal: data.kmTotal || 0,
 
         kmRate: data.kmRate,
+
+        kmChargeExempt: data.kmChargeExempt,
 
         additionalHourRate: data.additionalHourRate,
 
@@ -11571,6 +11575,8 @@ export default function Dashboard() {
                   amount: data.totalAmount,
 
                   discount: data.discount,
+
+                  kmChargeExempt: data.kmChargeExempt,
 
                   description: data.expenseDetails,
 

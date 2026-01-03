@@ -38,6 +38,7 @@ const ensureIntegrationSettingsColumns = async () => {
         add column if not exists pix_key_type text,
         add column if not exists pix_account_holder text;
     `);
+    await pool.query("notify pgrst, 'reload schema'");
   } catch (error: any) {
     console.warn(
       '[ensureIntegrationSettingsColumns] Failed to ensure pix columns:',

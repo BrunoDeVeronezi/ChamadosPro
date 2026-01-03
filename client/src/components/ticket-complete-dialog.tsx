@@ -32,6 +32,7 @@ interface TicketCompleteDialogProps {
   onComplete: (data: {
     kmTotal: number;
     kmRate?: number; // Taxa de KM (opcional)
+    kmChargeExempt?: boolean; // Isentar KM da cobranca do cliente
     additionalHourRate?: number; // Valor da hora adicional (opcional)
     extraExpenses: number;
     expenseDetails: string;
@@ -192,6 +193,7 @@ export function TicketCompleteDialog({
   const [includedHours, setIncludedHours] = useState<number>(0);
   const [paymentDate, setPaymentDate] = useState<string>('');
   const [shouldIssueReceipt, setShouldIssueReceipt] = useState<boolean>(false);
+  const [isKmChargeExempt, setIsKmChargeExempt] = useState(false);
   const [warranty, setWarranty] = useState<string>('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isPaymentDateAutoFilled, setIsPaymentDateAutoFilled] = useState(false);
@@ -337,6 +339,7 @@ export function TicketCompleteDialog({
       setTotalOverrideValue('');
       setIsTotalManuallyEdited(false);
       setIsPaymentDateAutoFilled(false);
+      setIsKmChargeExempt(false);
     }
   }, [isOpen, ticket?.id]);
 
@@ -380,7 +383,8 @@ export function TicketCompleteDialog({
   const extraExpensesNum = parseFloat(unmaskCurrency(extraCost)) || 0;
   const discountNum = Math.max(0, parseFloat(unmaskCurrency(discount)) || 0);
 
-  const kmValue = kmTotalNum * kmRateNum;
+  const kmValueRaw = kmTotalNum * kmRateNum;
+  const kmValue = isKmChargeExempt ? 0 : kmValueRaw;
   const extraHoursValue = extraHours * extraHourRateNum;
   const calculatedTotal =
     baseAmount + extraHoursValue + kmValue + extraExpensesNum;
@@ -466,6 +470,7 @@ export function TicketCompleteDialog({
       await onComplete({
         kmTotal: kmTotalNum,
         kmRate: kmRateNum,
+        kmChargeExempt: isKmChargeExempt,
         additionalHourRate: extraHourRateNum,
         extraExpenses: extraExpensesNum,
         expenseDetails: extraDesc,
@@ -783,6 +788,21 @@ export function TicketCompleteDialog({
                         />
                       </div>
                     </div>
+                    <div className='flex items-center space-x-2'>
+                      <Checkbox
+                        id='km-charge-exempt'
+                        checked={isKmChargeExempt}
+                        onCheckedChange={(checked) =>
+                          setIsKmChargeExempt(checked === true)
+                        }
+                      />
+                      <label
+                        htmlFor='km-charge-exempt'
+                        className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer'
+                      >
+                        Isentar KM da cobranca do cliente
+                      </label>
+                    </div>
                   </>
                 ) : null}
 
@@ -792,7 +812,18 @@ export function TicketCompleteDialog({
                       <div className='p-3 rounded-lg bg-muted/40 space-y-1'>
                         <p className='text-muted-foreground'>Valor KM</p>
                         <p className='font-semibold text-lg'>
-                          R${kmValue.toFixed(2)}
+                          {isKmChargeExempt ? (
+                            <>
+                              <span className='line-through text-muted-foreground'>
+                                R$ {kmValueRaw.toFixed(2)}
+                              </span>
+                              <span className='ml-2 text-xs text-muted-foreground'>
+                                Isento
+                              </span>
+                            </>
+                          ) : (
+                            <>R$ {kmValueRaw.toFixed(2)}</>
+                          )}
                         </p>
                       </div>
                     )}
@@ -887,6 +918,12 @@ export function TicketCompleteDialog({
                     <span>Total calculado</span>
                     <span>R$ {calculatedTotal.toFixed(2)}</span>
                   </div>
+                  {isKmChargeExempt && kmValueRaw > 0 && (
+                    <div className='flex items-center justify-between text-sm text-muted-foreground'>
+                      <span>KM isento</span>
+                      <span>R$ {kmValueRaw.toFixed(2)}</span>
+                    </div>
+                  )}
                   {hasDiscount && (
                     <div className='flex items-center justify-between text-sm text-muted-foreground'>
                       <span>Desconto</span>

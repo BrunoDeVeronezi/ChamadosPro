@@ -10,3 +10,8 @@ data/
 .env
 .env.local
 temp/
+assets/
+__pycache__/
+*.pyc
+depth_trace.txt
+div_trace.txt

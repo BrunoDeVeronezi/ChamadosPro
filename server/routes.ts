@@ -1736,11 +1736,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           normalizedSettings?.workingDays
         );
         res.json({ ...normalizedSettings, workingDays: derivedWorkingDays });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error updating integration settings:', error);
-        res
-          .status(500)
-          .json({ message: 'Failed to update integration settings' });
+        res.status(500).json({
+          message:
+            error?.message || 'Failed to update integration settings',
+        });
       }
     }
   );
@@ -11030,7 +11031,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return httpServer;
 }
-
 
 
 

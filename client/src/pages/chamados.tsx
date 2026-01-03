@@ -1846,6 +1846,7 @@ export default function Chamados() {
       data: {
         kmTotal: number;
         kmRate?: number;
+        kmChargeExempt?: boolean;
         additionalHourRate?: number;
         extraExpenses: number;
         expenseDetails: string;
@@ -5615,6 +5616,7 @@ export default function Chamados() {
                   date: data.paymentDate || new Date().toISOString(),
                   amount: data.totalAmount,
                   discount: data.discount,
+                  kmChargeExempt: data.kmChargeExempt,
                   description: data.expenseDetails,
                   warranty: data.warranty,
                 },

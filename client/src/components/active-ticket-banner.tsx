@@ -289,7 +289,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Verificar status de conexão do Google Calendar
+  // Verificar status de conexÃ£o do Google Calendar
 
   const { data: integrationSettings } = useQuery<{
 
@@ -311,7 +311,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Função para determinar todos os tickets ativos
+  // FunÃ§Ã£o para determinar todos os tickets ativos
 
   const determineActiveTickets = () => {
 
@@ -326,7 +326,7 @@ export function ActiveTicketBanner() {
     // Lista de tickets ativos encontrados
 
     const activeTicketsList: Array<{ id: string; startedAt: string }> = [];
-// Se não tem tickets no localStorage, verificar dados da query
+// Se nÃ£o tem tickets no localStorage, verificar dados da query
 
     if (storedTicketIds.length === 0) {
 
@@ -426,7 +426,7 @@ export function ActiveTicketBanner() {
 
             hasCompletedAt ||
 
-            status === 'CONCLUÍDO' ||
+            status === 'CONCLUÃDO' ||
 
             status === 'CONCLUIDO' ||
 
@@ -442,13 +442,13 @@ export function ActiveTicketBanner() {
 
             storageUpdated = true;
 
-            return; // Não adicionar à lista
+            return; // NÃ£o adicionar Ã  lista
 
           }
 
 
 
-          // Ticket ainda ativo - usar startedAt do backend se disponível, senão do localStorage
+          // Ticket ainda ativo - usar startedAt do backend se disponÃ­vel, senÃ£o do localStorage
 
           const backendStartedAt = (ticket as any).startedAt;
 
@@ -472,11 +472,11 @@ export function ActiveTicketBanner() {
 
         } else {
 
-          // Ticket não encontrado nos dados do backend (carregados)
+          // Ticket nÃ£o encontrado nos dados do backend (carregados)
 
-          // Se os tickets foram carregados e este ID não está lá, ele foi deletado
+          // Se os tickets foram carregados e este ID nÃ£o estÃ¡ lÃ¡, ele foi deletado
 
-          // ou não pertence mais ao usuário. Limpar do localStorage.
+          // ou nÃ£o pertence mais ao usuÃ¡rio. Limpar do localStorage.
 
           delete storedStartedAt[ticketId];
 
@@ -498,7 +498,7 @@ export function ActiveTicketBanner() {
 
     } else {
 
-      // Dados ainda não carregaram ou erro ao carregar - usar do localStorage (temporariamente)
+      // Dados ainda nÃ£o carregaram ou erro ao carregar - usar do localStorage (temporariamente)
 
       storedTicketIds.forEach((ticketId) => {
 
@@ -522,7 +522,7 @@ export function ActiveTicketBanner() {
 
   // Determinar tickets ativos ao montar e quando tickets mudam
 
-  // Usar useMemo para evitar chamadas desnecessárias
+  // Usar useMemo para evitar chamadas desnecessÃ¡rias
 
   const ticketsRef = useRef<Ticket[] | undefined>(tickets);
 
@@ -536,7 +536,7 @@ export function ActiveTicketBanner() {
 
   useEffect(() => {
 
-    // Só chamar determineActiveTickets se tickets realmente mudaram
+    // SÃ³ chamar determineActiveTickets se tickets realmente mudaram
 
     const currentTickets = ticketsRef.current;
 
@@ -550,7 +550,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Verificar localStorage ao montar (ANTES de tickets carregarem) - PRIORIDADE MÁXIMA
+  // Verificar localStorage ao montar (ANTES de tickets carregarem) - PRIORIDADE MÃXIMA
 
   useEffect(() => {
 
@@ -592,7 +592,7 @@ export function ActiveTicketBanner() {
 
 
 
-    // Verificar novamente após um pequeno delay (para garantir que não foi sobrescrito)
+    // Verificar novamente apÃ³s um pequeno delay (para garantir que nÃ£o foi sobrescrito)
 
     const timeout = setTimeout(() => {
 
@@ -612,7 +612,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Listener para mudanças no localStorage (de outras abas/contextos)
+  // Listener para mudanÃ§as no localStorage (de outras abas/contextos)
 
   useEffect(() => {
 
@@ -632,11 +632,11 @@ export function ActiveTicketBanner() {
 
 
 
-    // Verificar periodicamente (para mudanças na mesma aba) - reduzir frequência para evitar loops
+    // Verificar periodicamente (para mudanÃ§as na mesma aba) - reduzir frequÃªncia para evitar loops
 
     const interval = setInterval(() => {
 
-      // Só verificar se tickets mudaram desde a última verificação
+      // SÃ³ verificar se tickets mudaram desde a Ãºltima verificaÃ§Ã£o
 
       const currentTickets = ticketsRef.current;
 
@@ -739,7 +739,7 @@ export function ActiveTicketBanner() {
 
   useEffect(() => {
 
-    // Se não há tickets ativos, limpar o estado e não criar intervalo
+    // Se nÃ£o hÃ¡ tickets ativos, limpar o estado e nÃ£o criar intervalo
 
     if (activeTickets.length === 0) {
 
@@ -751,7 +751,7 @@ export function ActiveTicketBanner() {
 
 
 
-    // Função para calcular tempos decorridos
+    // FunÃ§Ã£o para calcular tempos decorridos
 
     const updateElapsedTimes = () => {
 
@@ -797,11 +797,11 @@ export function ActiveTicketBanner() {
 
 
 
-          //   // CORREÇÃO DINÂMICA DE FUSO HORÁRIO:
+          //   // CORREÃ‡ÃƒO DINÃ‚MICA DE FUSO HORÃRIO:
 
-          // Se o tempo decorrido for negativo, provavelmente é uma diferença de fuso horário (UTC vs Local).
+          // Se o tempo decorrido for negativo, provavelmente Ã© uma diferenÃ§a de fuso horÃ¡rio (UTC vs Local).
 
-          // Vamos detectar o deslocamento em horas cheias e ajustar o cálculo.
+          // Vamos detectar o deslocamento em horas cheias e ajustar o cÃ¡lculo.
 
           if (elapsedSeconds < 0) {
 
@@ -811,7 +811,7 @@ export function ActiveTicketBanner() {
 
             
 
-            // Se o ajuste de horas resultou em um tempo positivo e lógico (menos de 24h decorridas)
+            // Se o ajuste de horas resultou em um tempo positivo e lÃ³gico (menos de 24h decorridas)
 
             if (adjustedSeconds >= 0 && adjustedSeconds < 86400) {
 
@@ -819,7 +819,7 @@ export function ActiveTicketBanner() {
 
             } else {
 
-              // Se ainda assim for negativo, usamos o tempo do localStorage como último recurso
+              // Se ainda assim for negativo, usamos o tempo do localStorage como Ãºltimo recurso
 
               try {
 
@@ -901,7 +901,7 @@ export function ActiveTicketBanner() {
 
     };
 
-  }, [activeTickets]); //   // CORREÇÃO: Depender de activeTickets para recriar o intervalo quando mudar
+  }, [activeTickets]); //   // CORREÃ‡ÃƒO: Depender de activeTickets para recriar o intervalo quando mudar
 
   const clampBubblePosition = (x: number, y: number) => {
     if (typeof window === 'undefined') {
@@ -1074,7 +1074,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Se não há tickets ativos, não renderizar nada
+  // Se nÃ£o hÃ¡ tickets ativos, nÃ£o renderizar nada
 
   if (activeTickets.length === 0) {
 
@@ -1084,7 +1084,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Função para obter ticket completo (com fallback para ticket temporário)
+  // FunÃ§Ã£o para obter ticket completo (com fallback para ticket temporÃ¡rio)
 
   const getTicketData = (
 
@@ -1110,7 +1110,7 @@ export function ActiveTicketBanner() {
 
     }
 
-    // Se não encontrou o ticket mas temos ID e startedAt, criar ticket temporário
+    // Se nÃ£o encontrou o ticket mas temos ID e startedAt, criar ticket temporÃ¡rio
 
     return {
 
@@ -1141,6 +1141,8 @@ export function ActiveTicketBanner() {
     kmTotal: number,
 
     kmRate: number | undefined,
+
+    kmChargeExempt: boolean | undefined,
 
     additionalHourRate: number | undefined,
 
@@ -1196,7 +1198,7 @@ export function ActiveTicketBanner() {
 
           if (!userId) {
 
-            throw new Error('Não foi possível identificar o usuário');
+            throw new Error('NÃ£o foi possÃ­vel identificar o usuÃ¡rio');
 
           }
 
@@ -1220,7 +1222,7 @@ export function ActiveTicketBanner() {
 
           console.warn(
 
-            'Não foi possível atualizar ticketValue antes de finalizar:',
+            'NÃ£o foi possÃ­vel atualizar ticketValue antes de finalizar:',
 
             updateErr
 
@@ -1240,7 +1242,7 @@ export function ActiveTicketBanner() {
 
         throw new Error(
 
-          'Não foi possível determinar o valor base do chamado. Verifique se o chamado possui serviço ou valor definido.'
+          'NÃ£o foi possÃ­vel determinar o valor base do chamado. Verifique se o chamado possui serviÃ§o ou valor definido.'
 
         );
 
@@ -1251,6 +1253,7 @@ export function ActiveTicketBanner() {
       const completionPayload = {
         kmTotal: kmTotal || 0,
         kmRate: kmRate !== undefined && kmRate > 0 ? kmRate : undefined, // Enviar kmRate se fornecido
+        kmChargeExempt: kmChargeExempt,
         additionalHourRate: additionalHourRate, // Enviar additionalHourRate se fornecido
         extraExpenses: extraExpenses || 0,
         expenseDetails: expenseDetails || '',
@@ -1290,9 +1293,9 @@ export function ActiveTicketBanner() {
 
 
 
-      // Se chegou aqui, a finalização foi bem-sucedida
+      // Se chegou aqui, a finalizaÃ§Ã£o foi bem-sucedida
 
-      // Limpar do localStorage IMEDIATAMENTE - PRIORIDADE MÁXIMA
+      // Limpar do localStorage IMEDIATAMENTE - PRIORIDADE MÃXIMA
 
       clearTicketFromStorage(ticketToUse.id);
 
@@ -1400,7 +1403,7 @@ export function ActiveTicketBanner() {
 
           description:
 
-            'O chamado não foi encontrado no sistema. O banner foi fechado.',
+            'O chamado nÃ£o foi encontrado no sistema. O banner foi fechado.',
 
         });
 
@@ -1418,7 +1421,7 @@ export function ActiveTicketBanner() {
 
       let errorMessage =
 
-        'Não foi possível finalizar o chamado. Tente novamente.';
+        'NÃ£o foi possÃ­vel finalizar o chamado. Tente novamente.';
 
 
 
@@ -1502,6 +1505,8 @@ export function ActiveTicketBanner() {
 
       kmRate?: number;
 
+      kmChargeExempt?: boolean;
+
       additionalHourRate?: number;
 
       extraExpenses: number;
@@ -1536,7 +1541,7 @@ export function ActiveTicketBanner() {
 
 
 
-    // Garantir que estamos usando o ticket completo dos dados da query, não o temporário
+    // Garantir que estamos usando o ticket completo dos dados da query, nÃ£o o temporÃ¡rio
 
     const ticketToComplete =
 
@@ -1550,11 +1555,13 @@ export function ActiveTicketBanner() {
 
         ticketToComplete,
 
-        data.kmTotal || 0, // Passar kmTotal do formulário
+        data.kmTotal || 0, // Passar kmTotal do formulÃ¡rio
 
-        data.kmRate, // Passar kmRate do formulário (opcional)
+        data.kmRate, // Passar kmRate do formulÃ¡rio (opcional)
 
-        data.additionalHourRate, // Passar additionalHourRate do formulário
+        data.kmChargeExempt,
+
+        data.additionalHourRate, // Passar additionalHourRate do formulÃ¡rio
 
         data.extraExpenses || 0,
 
@@ -1602,7 +1609,7 @@ export function ActiveTicketBanner() {
 
           client: {
 
-            name: ticketToComplete.client?.name || 'Não informado',
+            name: ticketToComplete.client?.name || 'NÃ£o informado',
 
             email: ticketToComplete.client?.email,
 
@@ -1636,6 +1643,8 @@ export function ActiveTicketBanner() {
 
             kmRate: data.kmRate,
 
+            kmChargeExempt: data.kmChargeExempt,
+
             extraExpenses: data.extraExpenses,
 
             description: data.expenseDetails,
@@ -1652,7 +1661,7 @@ export function ActiveTicketBanner() {
 
     } catch (error) {
 
-      // Erro já foi tratado em completeTicket
+      // Erro jÃ¡ foi tratado em completeTicket
 
     }
 
@@ -1703,7 +1712,7 @@ export function ActiveTicketBanner() {
           }
 
         } catch (fetchErr: any) {
-// Se não encontrou o ticket (404), apenas limpar do localStorage e fechar banner
+// Se nÃ£o encontrou o ticket (404), apenas limpar do localStorage e fechar banner
 
           if (
 
@@ -1733,7 +1742,7 @@ export function ActiveTicketBanner() {
 
               description:
 
-                'O chamado não foi encontrado no sistema. O banner foi fechado.',
+                'O chamado nÃ£o foi encontrado no sistema. O banner foi fechado.',
 
             });
 
@@ -1741,7 +1750,7 @@ export function ActiveTicketBanner() {
 
           }
 
-          console.warn('Não foi possível buscar ticket do backend:', fetchErr);
+          console.warn('NÃ£o foi possÃ­vel buscar ticket do backend:', fetchErr);
 
         }
 
@@ -1769,7 +1778,7 @@ export function ActiveTicketBanner() {
 
         throw new Error(
 
-          'Não foi possível identificar o usuário para cancelar o chamado'
+          'NÃ£o foi possÃ­vel identificar o usuÃ¡rio para cancelar o chamado'
 
         );
 
@@ -1781,7 +1790,7 @@ export function ActiveTicketBanner() {
 
       await apiRequest('POST', `/api/tickets/${ticket.id}/cancel`, {
 
-        cancellationReason: cancellationDescription || 'Cancelado pelo usuário',
+        cancellationReason: cancellationDescription || 'Cancelado pelo usuÃ¡rio',
 
         cancellationSource: cancellationSource,
 
@@ -1887,7 +1896,7 @@ export function ActiveTicketBanner() {
 
           description:
 
-            'O chamado não foi encontrado no sistema. O banner foi fechado.',
+            'O chamado nÃ£o foi encontrado no sistema. O banner foi fechado.',
 
         });
 
@@ -1903,7 +1912,7 @@ export function ActiveTicketBanner() {
 
             error.message ||
 
-            'Não foi possível cancelar o chamado. Tente novamente.',
+            'NÃ£o foi possÃ­vel cancelar o chamado. Tente novamente.',
 
         });
 
@@ -1941,7 +1950,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Obter ticket que está sendo cancelado
+  // Obter ticket que estÃ¡ sendo cancelado
 
   const cancellingTicketInfo = cancellingTicketId
 
@@ -1957,7 +1966,7 @@ export function ActiveTicketBanner() {
 
 
 
-  // Obter ticket que está sendo finalizado
+  // Obter ticket que estÃ¡ sendo finalizado
 
   const completingTicketInfo = dialogTicketId
 
@@ -2051,11 +2060,11 @@ export function ActiveTicketBanner() {
 
           {activeTickets
 
-            .filter((ticketInfo) => ticketInfo && ticketInfo.id) // Filtrar tickets inválidos
+            .filter((ticketInfo) => ticketInfo && ticketInfo.id) // Filtrar tickets invÃ¡lidos
 
             .map((ticketInfo) => {
 
-              if (!ticketInfo || !ticketInfo.id) return null; // Verificação adicional
+              if (!ticketInfo || !ticketInfo.id) return null; // VerificaÃ§Ã£o adicional
 
               const ticket = getTicketData(ticketInfo);
 
@@ -2099,7 +2108,7 @@ export function ActiveTicketBanner() {
 
                 0;
 
-              // Considera horas extras após 1 minuto além do limite contratado
+              // Considera horas extras apÃ³s 1 minuto alÃ©m do limite contratado
 
               const isInExtraHours =
 
@@ -2445,7 +2454,7 @@ export function ActiveTicketBanner() {
 
                 >
 
-                  <span className='truncate'>Técnico</span>
+                  <span className='truncate'>TÃ©cnico</span>
 
                   <input
 
@@ -2483,7 +2492,7 @@ export function ActiveTicketBanner() {
 
                 id='cancellation-description'
 
-                placeholder='Ex: Cliente solicitou o reagendamento para outra data / Peça necessária não está em estoque.'
+                placeholder='Ex: Cliente solicitou o reagendamento para outra data / PeÃ§a necessÃ¡ria nÃ£o estÃ¡ em estoque.'
 
                 value={cancellationDescription}
 
@@ -2515,7 +2524,7 @@ export function ActiveTicketBanner() {
 
                 <p className='flex-1 text-sm font-normal leading-normal text-blue-800 dark:text-blue-200'>
 
-                  A ação removerá o evento do Google Calendar.
+                  A aÃ§Ã£o removerÃ¡ o evento do Google Calendar.
 
                 </p>
 
@@ -2579,7 +2588,7 @@ export function ActiveTicketBanner() {
 
 
 
-      {/* Confirmação para fechar modal de cancelamento */}
+      {/* ConfirmaÃ§Ã£o para fechar modal de cancelamento */}
 
       <AlertDialog
 
@@ -2593,11 +2602,11 @@ export function ActiveTicketBanner() {
 
           <AlertDialogHeader>
 
-            <AlertDialogTitle>Cancelar operação</AlertDialogTitle>
+            <AlertDialogTitle>Cancelar operaÃ§Ã£o</AlertDialogTitle>
 
             <AlertDialogDescription>
 
-              Tem certeza que deseja fechar? Os dados preenchidos serão
+              Tem certeza que deseja fechar? Os dados preenchidos serÃ£o
 
               perdidos.
 
@@ -2609,7 +2618,7 @@ export function ActiveTicketBanner() {
 
             <AlertDialogCancel onClick={() => setShowCancelCloseConfirm(false)}>
 
-              Não
+              NÃ£o
 
             </AlertDialogCancel>
 

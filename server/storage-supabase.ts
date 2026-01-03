@@ -2360,7 +2360,7 @@ export class SupabaseStorage implements IStorage {
     return data ? (toCamelCase(data) as IntegrationSettings) : undefined;
   }
 
-    async createIntegrationSettings(
+  async createIntegrationSettings(
     settingsData: InsertIntegrationSettings
   ): Promise<IntegrationSettings> {
     const dataToInsert = toSnakeCase(settingsData);
@@ -2396,6 +2396,7 @@ export class SupabaseStorage implements IStorage {
 
     return toCamelCase(data) as IntegrationSettings;
   }
+
   async updateIntegrationSettings(
     userId: string,
     settingsData: Partial<InsertIntegrationSettings>
