@@ -47,6 +47,7 @@ import { users } from '@shared/schema';
 import { buildPixPayload } from '@shared/pix';
 import { eq } from 'drizzle-orm';
 import { supabase } from './supabase-client';
+import { getNgrokUrl } from './ngrok-utils';
 // Asaas removido - será implementado Stripe
 import {
   generateConfirmationToken,
@@ -161,9 +162,75 @@ function getRoleVariants(role: 'technician' | 'company'): string[] {
 const TRIAL_DAYS = 30;
 const TRIAL_GRACE_DAYS = 5;
 const TRIAL_DEVICE_COOKIE = 'chamadospro_device_id';
+const PAYMENT_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function normalizeDocumentValue(value: string | null | undefined): string {
   return (value || '').replace(/\D/g, '');
+}
+
+type PaymentLinkPayload = {
+  userId: string;
+  referenceId: string;
+  exp: number;
+};
+
+function decodeBase64Url(input: string): Buffer {
+  const padding = input.length % 4;
+  const padded = padding ? input + '='.repeat(4 - padding) : input;
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(base64, 'base64');
+}
+
+function safeTimingEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
+
+function getPaymentLinkSecret(): string {
+  return (
+    process.env.PAYMENT_LINK_SECRET ||
+    process.env.SESSION_SECRET ||
+    'change-me'
+  );
+}
+
+function createPaymentLinkToken(payload: PaymentLinkPayload): string {
+  const encoded = base64Url(Buffer.from(JSON.stringify(payload), 'utf8'));
+  const signature = base64Url(
+    crypto.createHmac('sha256', getPaymentLinkSecret()).update(encoded).digest()
+  );
+  return `${encoded}.${signature}`;
+}
+
+function parsePaymentLinkToken(token: string): PaymentLinkPayload | null {
+  const [encoded, signature] = token.split('.');
+  if (!encoded || !signature) return null;
+  const expected = base64Url(
+    crypto.createHmac('sha256', getPaymentLinkSecret()).update(encoded).digest()
+  );
+  if (!safeTimingEqual(signature, expected)) return null;
+
+  let payload: PaymentLinkPayload | null = null;
+  try {
+    payload = JSON.parse(
+      decodeBase64Url(encoded).toString('utf8')
+    ) as PaymentLinkPayload;
+  } catch {
+    payload = null;
+  }
+  if (!payload?.userId || !payload?.referenceId || !payload?.exp) {
+    return null;
+  }
+  if (Date.now() > payload.exp) return null;
+  return payload;
+}
+
+function buildPaymentLinkUrl(req: any, token: string): string {
+  const baseUrl = (process.env.BASE_URL || getRequestBaseUrl(req)).replace(
+    /\/+$/,
+    ''
+  );
+  return `${baseUrl}/pagamento/${token}`;
 }
 
 function parseCookies(cookieHeader: string | undefined): Record<string, string> {
@@ -202,6 +269,30 @@ function getTrialDeviceId(req: any): string | null {
   if (fromBody) return fromBody;
   const fromCookie = getCookieValue(req, TRIAL_DEVICE_COOKIE);
   return fromCookie ? fromCookie.trim() : null;
+}
+
+function getMercadoPagoRedirectUri(req: any): string {
+  if (process.env.MERCADOPAGO_REDIRECT_URI) {
+    return process.env.MERCADOPAGO_REDIRECT_URI;
+  }
+
+  const ngrokUrl = getNgrokUrl();
+  if (ngrokUrl) {
+    return `${ngrokUrl}/api/mercadopago/oauth/callback`;
+  }
+
+  const forwardedProto = req.get('x-forwarded-proto');
+  const forwardedHost = req.get('x-forwarded-host');
+  const protocol = forwardedProto || req.protocol || 'http';
+  let host = forwardedHost || req.get('host') || 'localhost:5180';
+
+  if (protocol === 'http' && host.endsWith(':80')) {
+    host = host.replace(':80', '');
+  } else if (protocol === 'https' && host.endsWith(':443')) {
+    host = host.replace(':443', '');
+  }
+
+  return `${protocol}://${host}/api/mercadopago/oauth/callback`;
 }
 
 function formatCpf(value: string): string | null {
@@ -1273,6 +1364,366 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { user, ticket };
   };
 
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+
+  const formatDate = (value: any) => {
+    if (!value) return '';
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleDateString('pt-BR');
+  };
+
+  const normalizePhone = (value?: string) => {
+    if (!value) return '';
+    return value.replace(/\D/g, '');
+  };
+
+  const coerceNumber = (value: any) => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      const cleaned = value.replace(',', '.').replace(/[^\d.-]/g, '');
+      const parsed = Number.parseFloat(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const resolveDateValue = (value: any) => {
+    if (!value) return undefined;
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return undefined;
+    return parsed.toISOString();
+  };
+
+  const resolvePaymentContext = async (
+    userId: string,
+    ticketOrRecordId: string
+  ) => {
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return { error: { status: 404, message: 'User not found' } };
+    }
+
+    const recordById = await storage.getFinancialRecord(ticketOrRecordId);
+    if (recordById) {
+      let allowed = recordById.userId === userId;
+      if (!allowed && user.role === 'company') {
+        const technicianIds = await loadCompanyTechnicians(userId);
+        allowed = technicianIds.includes(recordById.userId);
+      }
+      if (!allowed) {
+        return { error: { status: 403, message: 'Forbidden' } };
+      }
+      const ticket = recordById.ticketId
+        ? await storage.getTicket(recordById.ticketId)
+        : undefined;
+      const client =
+        (recordById.clientId
+          ? await storage.getClient(recordById.clientId)
+          : undefined) ||
+        (ticket?.clientId ? await storage.getClient(ticket.clientId) : undefined);
+      return { user, record: recordById, ticket, client };
+    }
+
+    const access = await loadTicketWithAccess(userId, ticketOrRecordId);
+    if (access.error) {
+      return { error: access.error };
+    }
+
+    const { ticket } = access;
+    let records = await storage.getFinancialRecordsByUser(userId, {
+      ticketId: ticket.id,
+    });
+    if (records.length === 0 && user.role === 'company') {
+      records = await storage.getFinancialRecordsByUser(ticket.userId, {
+        ticketId: ticket.id,
+      });
+    }
+
+    let record = records[0];
+    if (!record) {
+      const amount = coerceNumber(
+        (ticket as any)?.totalAmount ?? ticket.ticketValue ?? 0
+      );
+      const dueDateValue =
+        resolveDateValue(
+          ticket.paymentDate ||
+            ticket.dueDate ||
+            ticket.completedAt ||
+            ticket.stoppedAt ||
+            (ticket as any).scheduledDate ||
+            ticket.createdAt
+        ) || new Date().toISOString();
+      if (!ticket.clientId) {
+        return { error: { status: 404, message: 'Client not found for ticket' } };
+      }
+      record = await storage.createFinancialRecord({
+        userId,
+        ticketId: ticket.id,
+        clientId: ticket.clientId,
+        amount,
+        type: 'receivable',
+        status: 'pending',
+        dueDate: dueDateValue,
+        description: ticket.ticketNumber
+          ? `Chamado #${ticket.ticketNumber}`
+          : `Chamado ${ticket.id.slice(0, 8)}`,
+      });
+    }
+
+    const client = ticket.clientId
+      ? await storage.getClient(ticket.clientId)
+      : undefined;
+
+    return { user, record, ticket, client };
+  };
+
+  const buildPaymentMessage = (options: {
+    clientName: string;
+    ticketRef: string;
+    amount: number;
+    dueDate?: string;
+    pixKey?: string;
+    pixPayload: string;
+    paymentUrl?: string;
+  }) => {
+    const lines = [
+      `Ola ${options.clientName || 'cliente'},`,
+      `Segue a cobranca do chamado ${options.ticketRef || 'sem-id'}.`,
+      `Valor: ${formatCurrency(options.amount)}`,
+    ];
+    if (options.dueDate) {
+      lines.push(`Vencimento: ${options.dueDate}`);
+    }
+    if (options.paymentUrl) {
+      lines.push(`Pague online (PIX ou cartao): ${options.paymentUrl}`);
+    }
+    if (options.pixKey) {
+      lines.push(`PIX: ${options.pixKey}`);
+    }
+    lines.push(`Copia e cola: ${options.pixPayload}`);
+    return lines.join('\n');
+  };
+
+  const MERCADOPAGO_API_BASE = 'https://api.mercadopago.com';
+
+  const getMercadoPagoAccessToken = async (userId: string) => {
+    const integration = await storage.getPaymentIntegration(
+      userId,
+      'mercadopago'
+    );
+
+    if (!integration?.accessToken) {
+      return null;
+    }
+
+    const expiresAt = integration.tokenExpiresAt
+      ? new Date(integration.tokenExpiresAt).getTime()
+      : null;
+    const isExpired = expiresAt ? expiresAt <= Date.now() + 60_000 : false;
+
+    if (!isExpired) {
+      return { accessToken: integration.accessToken, integration };
+    }
+
+    if (!integration.refreshToken) {
+      return { accessToken: integration.accessToken, integration };
+    }
+
+    const clientId = process.env.MERCADOPAGO_CLIENT_ID;
+    const clientSecret = process.env.MERCADOPAGO_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return { accessToken: integration.accessToken, integration };
+    }
+
+    const refreshResponse = await fetch(
+      `${MERCADOPAGO_API_BASE}/oauth/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: integration.refreshToken,
+        }),
+      }
+    );
+    const refreshData = await refreshResponse.json();
+
+    if (!refreshResponse.ok) {
+      console.error('[MercadoPago] Falha ao renovar token:', refreshData);
+      return { accessToken: integration.accessToken, integration };
+    }
+
+    const refreshedExpiresAt = refreshData.expires_in
+      ? new Date(Date.now() + Number(refreshData.expires_in) * 1000)
+      : null;
+
+    await storage.upsertPaymentIntegration({
+      userId,
+      provider: 'mercadopago',
+      status: 'connected',
+      accessToken: refreshData.access_token,
+      refreshToken: refreshData.refresh_token || integration.refreshToken,
+      tokenExpiresAt: refreshedExpiresAt || undefined,
+      scope: refreshData.scope || integration.scope,
+      providerUserId: refreshData.user_id
+        ? String(refreshData.user_id)
+        : integration.providerUserId,
+      publicKey: refreshData.public_key || integration.publicKey,
+      metadata: {
+        ...(integration.metadata || {}),
+        live_mode: refreshData.live_mode ?? integration.metadata?.live_mode ?? null,
+        token_type:
+          refreshData.token_type ?? integration.metadata?.token_type ?? null,
+      },
+    });
+
+    return { accessToken: refreshData.access_token, integration };
+  };
+
+  const createMercadoPagoPixCharge = async (options: {
+    userId: string;
+    ticketRef: string;
+    amount: number;
+    description: string;
+    client: any;
+    user: any;
+  }) => {
+    const tokenInfo = await getMercadoPagoAccessToken(options.userId);
+    if (!tokenInfo?.accessToken) {
+      return null;
+    }
+
+    const clientDocument = normalizeDocumentValue(options.client?.document);
+    const documentType =
+      clientDocument.length === 11
+        ? 'CPF'
+        : clientDocument.length === 14
+          ? 'CNPJ'
+          : null;
+
+    if (!documentType) {
+      const error: any = new Error(
+        'CPF ou CNPJ do cliente obrigatorio para gerar cobranca.'
+      );
+      error.code = 'MISSING_CLIENT_DOCUMENT';
+      throw error;
+    }
+
+    const clientName =
+      options.client?.name ||
+      options.user?.companyName ||
+      [options.user?.firstName, options.user?.lastName].filter(Boolean).join(' ') ||
+      'Cliente';
+    const nameParts = clientName.trim().split(/\s+/);
+    const firstName = nameParts.shift() || 'Cliente';
+    const lastName = nameParts.join(' ') || 'Cliente';
+    const payerEmail =
+      options.client?.email || options.user?.email || 'contato@cliente.com';
+
+    const paymentResponse = await fetch(
+      `${MERCADOPAGO_API_BASE}/v1/payments`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenInfo.accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': randomUUID(),
+        },
+        body: JSON.stringify({
+          transaction_amount: Number(options.amount),
+          description: options.description,
+          payment_method_id: 'pix',
+          external_reference: options.ticketRef,
+          payer: {
+            email: payerEmail,
+            first_name: firstName,
+            last_name: lastName,
+            identification: {
+              type: documentType,
+              number: clientDocument,
+            },
+          },
+        }),
+      }
+    );
+
+    const paymentData = await paymentResponse.json();
+
+    if (!paymentResponse.ok) {
+      console.error('[MercadoPago] Erro ao criar pagamento:', paymentData);
+      const error: any = new Error(
+        paymentData?.message || 'Erro ao criar cobranca no Mercado Pago.'
+      );
+      error.code = paymentData?.error || 'MERCADOPAGO_PAYMENT_ERROR';
+      throw error;
+    }
+
+    const transactionData =
+      paymentData?.point_of_interaction?.transaction_data || {};
+    const pixPayload = transactionData.qr_code || '';
+    const qrCodeBase64 = transactionData.qr_code_base64 || '';
+    const qrCodeDataUrl = qrCodeBase64
+      ? `data:image/png;base64,${qrCodeBase64}`
+      : '';
+
+    if (!pixPayload) {
+      const error: any = new Error(
+        'Nao foi possivel gerar o PIX pelo Mercado Pago.'
+      );
+      error.code = 'MERCADOPAGO_PIX_MISSING';
+      throw error;
+    }
+
+    return {
+      paymentId: paymentData?.id || null,
+      status: paymentData?.status || null,
+      pixPayload,
+      qrCodeDataUrl,
+    };
+  };
+
+  const createMercadoPagoPayment = async (
+    accessToken: string,
+    payload: Record<string, any>
+  ) => {
+    const paymentResponse = await fetch(
+      `${MERCADOPAGO_API_BASE}/v1/payments`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': randomUUID(),
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const paymentData = await paymentResponse.json();
+
+    if (!paymentResponse.ok) {
+      console.error('[MercadoPago] Erro ao criar pagamento:', paymentData);
+      const error: any = new Error(
+        paymentData?.message || 'Erro ao criar pagamento no Mercado Pago.'
+      );
+      error.code = paymentData?.error || 'MERCADOPAGO_PAYMENT_ERROR';
+      error.details = paymentData;
+      throw error;
+    }
+
+    return paymentData;
+  };
+
   const loadClientsForUser = async (
     userId: string,
     role?: string | null
@@ -1745,6 +2196,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  app.get('/api/mercadopago/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const configured = Boolean(
+        process.env.MERCADOPAGO_CLIENT_ID &&
+          process.env.MERCADOPAGO_CLIENT_SECRET
+      );
+
+      if (!configured) {
+        return res.json({
+          configured: false,
+          connected: false,
+          status: 'not_configured',
+        });
+      }
+
+      const integration = await storage.getPaymentIntegration(
+        userId,
+        'mercadopago'
+      );
+
+      if (!integration) {
+        return res.json({
+          configured: true,
+          connected: false,
+          status: 'not_connected',
+        });
+      }
+
+      const rawExpiresAt = integration.tokenExpiresAt
+        ? new Date(integration.tokenExpiresAt)
+        : null;
+      const isExpired = rawExpiresAt
+        ? rawExpiresAt.getTime() <= Date.now()
+        : false;
+      const status = isExpired ? 'expired' : integration.status || 'connected';
+
+      res.json({
+        configured: true,
+        connected: status === 'connected' || status === 'active',
+        status,
+        providerUserId: integration.providerUserId,
+        publicKey: integration.publicKey,
+        scope: integration.scope,
+        tokenExpiresAt: rawExpiresAt ? rawExpiresAt.toISOString() : null,
+      });
+    } catch (error: any) {
+      console.error('[MercadoPago] Erro ao buscar status:', error);
+      res.status(500).json({ message: 'Failed to fetch Mercado Pago status' });
+    }
+  });
+
+  app.get(
+    '/api/mercadopago/oauth/start',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const clientId = process.env.MERCADOPAGO_CLIENT_ID;
+        const clientSecret = process.env.MERCADOPAGO_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+          return res.status(500).json({
+            message: 'Mercado Pago nao configurado.',
+          });
+        }
+
+        const redirectUri = getMercadoPagoRedirectUri(req);
+        const state = randomUUID();
+        const codeVerifier = generateCodeVerifier();
+        const codeChallenge = generateCodeChallenge(codeVerifier);
+        const rawReturnTo =
+          typeof req.query?.returnTo === 'string'
+            ? req.query.returnTo
+            : '/dashboard-financeiro';
+        const returnTo = rawReturnTo.startsWith('/')
+          ? rawReturnTo
+          : '/dashboard-financeiro';
+
+        if (req.session) {
+          req.session.mercadopagoOAuth = {
+            state,
+            userId: req.user.id,
+            returnTo,
+            codeVerifier,
+          };
+        }
+
+        const scope =
+          process.env.MERCADOPAGO_OAUTH_SCOPE || 'read write offline_access';
+        const authBase =
+          process.env.MERCADOPAGO_AUTH_URL ||
+          'https://auth.mercadopago.com.br/authorization';
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: clientId,
+          redirect_uri: redirectUri,
+          state,
+          platform_id: 'mp',
+          scope,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        });
+        const authUrl = `${authBase}?${params.toString()}`;
+
+        if (req.session?.save) {
+          req.session.save(() => {
+            res.json({ url: authUrl });
+          });
+        } else {
+          res.json({ url: authUrl });
+        }
+      } catch (error: any) {
+        console.error('[MercadoPago] Erro ao iniciar OAuth:', error);
+        res.status(500).json({ message: 'Failed to start Mercado Pago OAuth' });
+      }
+    }
+  );
+
+  app.get('/api/mercadopago/oauth/callback', async (req: any, res) => {
+    try {
+      const { code, state, error, error_description } = req.query;
+      const sessionData = req.session?.mercadopagoOAuth;
+
+      const returnTo = sessionData?.returnTo || '/dashboard-financeiro';
+      const safeReturnTo = returnTo.startsWith('/')
+        ? returnTo
+        : '/dashboard-financeiro';
+      const redirectWithStatus = (status: string) => {
+        if (safeReturnTo.includes('mp=')) {
+          return res.redirect(safeReturnTo);
+        }
+        const separator = safeReturnTo.includes('?') ? '&' : '?';
+        return res.redirect(`${safeReturnTo}${separator}mp=${status}`);
+      };
+
+      if (error) {
+        console.error('[MercadoPago] OAuth error:', {
+          error,
+          error_description,
+        });
+        return redirectWithStatus('error');
+      }
+
+      if (!code || !state || !sessionData || sessionData.state !== state) {
+        console.error('[MercadoPago] Estado invalido ou sessao perdida.');
+        return redirectWithStatus('error');
+      }
+
+      if (!sessionData.codeVerifier) {
+        console.error('[MercadoPago] code_verifier ausente na sessao.');
+        return redirectWithStatus('error');
+      }
+
+      const clientId = process.env.MERCADOPAGO_CLIENT_ID;
+      const clientSecret = process.env.MERCADOPAGO_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        console.error('[MercadoPago] Credenciais ausentes.');
+        return redirectWithStatus('error');
+      }
+
+      const redirectUri = getMercadoPagoRedirectUri(req);
+      const tokenResponse = await fetch(
+        'https://api.mercadopago.com/oauth/token',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: clientId,
+            client_secret: clientSecret,
+            code: String(code),
+            redirect_uri: redirectUri,
+            code_verifier: sessionData.codeVerifier,
+          }),
+        }
+      );
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenResponse.ok) {
+        console.error('[MercadoPago] Erro ao trocar token:', tokenData);
+        return redirectWithStatus('error');
+      }
+
+      const expiresAt = tokenData.expires_in
+        ? new Date(Date.now() + Number(tokenData.expires_in) * 1000)
+        : null;
+
+      await storage.upsertPaymentIntegration({
+        userId: sessionData.userId,
+        provider: 'mercadopago',
+        status: 'connected',
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+        tokenExpiresAt: expiresAt || undefined,
+        scope: tokenData.scope || null,
+        providerUserId: tokenData.user_id ? String(tokenData.user_id) : null,
+        publicKey: tokenData.public_key || null,
+        metadata: {
+          live_mode: tokenData.live_mode ?? null,
+          token_type: tokenData.token_type ?? null,
+        },
+      });
+
+      if (req.session) {
+        delete req.session.mercadopagoOAuth;
+      }
+
+      return redirectWithStatus('connected');
+    } catch (error: any) {
+      console.error('[MercadoPago] Erro no callback:', error);
+      return res.redirect('/dashboard-financeiro?mp=error');
+    }
+  });
 
   app.get('/api/local-events', isAuthenticated, async (req: any, res) => {
     try {
@@ -2657,6 +3326,664 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  app.post(
+    '/api/tickets/:id/send-payment-link',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const ticketOrRecordId =
+          typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+        if (!ticketOrRecordId) {
+          return res.status(400).json({ message: 'Ticket id is required' });
+        }
+
+        const context = await resolvePaymentContext(userId, ticketOrRecordId);
+        if (context.error) {
+          return res
+            .status(context.error.status)
+            .json({ message: context.error.message });
+        }
+
+        const ticket = context.ticket as any;
+        const record = context.record as any;
+        const client = context.client as any;
+        const amount = coerceNumber(
+          record?.amount ?? ticket?.totalAmount ?? ticket?.ticketValue ?? 0
+        );
+        const dueDateValue =
+          record?.dueDate ?? ticket?.paymentDate ?? ticket?.dueDate ?? null;
+        const dueDate = dueDateValue ? formatDate(dueDateValue) : '';
+        const ticketRef =
+          ticket?.ticketNumber ||
+          ticket?.id?.slice(0, 8) ||
+          record?.id?.slice(0, 8) ||
+          '';
+        const clientName =
+          client?.name ||
+          ticket?.client?.name ||
+          ticket?.clientName ||
+          'cliente';
+
+        const settings = await storage.getIntegrationSettings(userId);
+        const preferredProvider =
+          typeof req.body?.provider === 'string'
+            ? req.body.provider.trim().toLowerCase()
+            : 'auto';
+
+        let pixPayload = '';
+        let qrCodeDataUrl = '';
+        let pixKeyLabel = settings?.pixKey ? settings.pixKey.trim() : '';
+        let provider = 'pix';
+        let paymentId: string | null = null;
+
+        if (preferredProvider !== 'pix') {
+          try {
+            const mpCharge = await createMercadoPagoPixCharge({
+              userId,
+              ticketRef: ticketRef || 'sem-id',
+              amount,
+              description: `Chamado ${ticketRef || 'sem-id'}`,
+              client,
+              user: context.user,
+            });
+            if (mpCharge?.pixPayload) {
+              pixPayload = mpCharge.pixPayload;
+              qrCodeDataUrl = mpCharge.qrCodeDataUrl;
+              provider = 'mercadopago';
+              paymentId = mpCharge.paymentId || null;
+            }
+          } catch (error: any) {
+            if (error?.code === 'MISSING_CLIENT_DOCUMENT') {
+              return res.status(400).json({
+                message: error.message,
+                code: 'MISSING_CLIENT_DOCUMENT',
+              });
+            }
+            console.error('[MercadoPago] Falha ao gerar PIX:', error);
+            return res.status(500).json({
+              message: error?.message || 'Falha ao gerar PIX no Mercado Pago.',
+            });
+          }
+        }
+
+        if (!pixPayload) {
+          const pixKey = settings?.pixKey ? settings.pixKey.trim() : '';
+          if (!pixKey) {
+            return res.status(400).json({ message: 'PIX key not configured' });
+          }
+
+          const merchantName =
+            settings?.pixAccountHolder?.trim() ||
+            context.user?.companyName ||
+            [context.user?.firstName, context.user?.lastName]
+              .filter(Boolean)
+              .join(' ') ||
+            'RECEBEDOR';
+          const merchantCity = context.user?.city || 'BRASIL';
+          const txidBase = `TICKET${ticketRef}`.replace(/[^A-Za-z0-9]/g, '');
+          pixPayload = buildPixPayload({
+            pixKey,
+            amount: amount > 0 ? amount : undefined,
+            merchantName,
+            merchantCity,
+            txid: txidBase.slice(0, 25),
+            description: `Chamado ${ticketRef || 'sem-id'}`,
+          });
+          qrCodeDataUrl = await QRCode.toDataURL(pixPayload, {
+            width: 240,
+            margin: 1,
+          });
+          pixKeyLabel = pixKey;
+        }
+
+        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
+        const paymentUrl =
+          provider === 'mercadopago' && referenceId
+            ? buildPaymentLinkUrl(
+                req,
+                createPaymentLinkToken({
+                  userId,
+                  referenceId,
+                  exp: Date.now() + PAYMENT_LINK_TTL_MS,
+                })
+              )
+            : '';
+
+        const baseMessage = buildPaymentMessage({
+          clientName,
+          ticketRef: ticketRef || 'sem-id',
+          amount,
+          dueDate,
+          pixKey: pixKeyLabel,
+          pixPayload,
+          paymentUrl,
+        });
+
+        const customMessage =
+          typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+        let finalMessage = customMessage || baseMessage;
+        if (pixPayload && !finalMessage.includes(pixPayload)) {
+          finalMessage = `${finalMessage}\nCopia e cola: ${pixPayload}`;
+        }
+
+        const phone = normalizePhone(req.body?.phone);
+        const whatsappUrl = phone
+          ? `https://wa.me/55${phone}?text=${encodeURIComponent(finalMessage)}`
+          : `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
+
+        res.json({
+          whatsappUrl,
+          message: finalMessage,
+          pixPayload,
+          pixKey: pixKeyLabel || null,
+          pixAccountHolder: settings?.pixAccountHolder?.trim() || null,
+          qrCodeDataUrl,
+          amount,
+          dueDate,
+          paymentUrl: paymentUrl || null,
+          provider,
+          paymentId,
+        });
+      } catch (error: any) {
+        console.error('[POST /api/tickets/:id/send-payment-link] Error:', error);
+        res.status(500).json({
+          message: error?.message || 'Failed to generate payment link',
+        });
+      }
+    }
+  );
+
+  app.post(
+    '/api/tickets/:id/send-payment-link-email',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const ticketOrRecordId =
+          typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+        if (!ticketOrRecordId) {
+          return res.status(400).json({ message: 'Ticket id is required' });
+        }
+
+        const email =
+          typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+        if (!email) {
+          return res.status(400).json({ message: 'Email is required' });
+        }
+
+        const context = await resolvePaymentContext(userId, ticketOrRecordId);
+        if (context.error) {
+          return res
+            .status(context.error.status)
+            .json({ message: context.error.message });
+        }
+
+        const ticket = context.ticket as any;
+        const record = context.record as any;
+        const client = context.client as any;
+        const amount = coerceNumber(
+          record?.amount ?? ticket?.totalAmount ?? ticket?.ticketValue ?? 0
+        );
+        const dueDateValue =
+          record?.dueDate ?? ticket?.paymentDate ?? ticket?.dueDate ?? null;
+        const dueDate = dueDateValue ? formatDate(dueDateValue) : '';
+        const ticketRef =
+          ticket?.ticketNumber ||
+          ticket?.id?.slice(0, 8) ||
+          record?.id?.slice(0, 8) ||
+          '';
+        const clientName =
+          client?.name ||
+          ticket?.client?.name ||
+          ticket?.clientName ||
+          'cliente';
+
+        const settings = await storage.getIntegrationSettings(userId);
+        const preferredProvider =
+          typeof req.body?.provider === 'string'
+            ? req.body.provider.trim().toLowerCase()
+            : 'auto';
+
+        let pixPayload = '';
+        let qrCodeDataUrl = '';
+        let pixKeyLabel = settings?.pixKey ? settings.pixKey.trim() : '';
+        let provider = 'pix';
+        let paymentId: string | null = null;
+
+        if (preferredProvider !== 'pix') {
+          try {
+            const mpCharge = await createMercadoPagoPixCharge({
+              userId,
+              ticketRef: ticketRef || 'sem-id',
+              amount,
+              description: `Chamado ${ticketRef || 'sem-id'}`,
+              client,
+              user: context.user,
+            });
+            if (mpCharge?.pixPayload) {
+              pixPayload = mpCharge.pixPayload;
+              qrCodeDataUrl = mpCharge.qrCodeDataUrl;
+              provider = 'mercadopago';
+              paymentId = mpCharge.paymentId || null;
+            }
+          } catch (error: any) {
+            if (error?.code === 'MISSING_CLIENT_DOCUMENT') {
+              return res.status(400).json({
+                message: error.message,
+                code: 'MISSING_CLIENT_DOCUMENT',
+              });
+            }
+            console.error('[MercadoPago] Falha ao gerar PIX:', error);
+            return res.status(500).json({
+              message: error?.message || 'Falha ao gerar PIX no Mercado Pago.',
+            });
+          }
+        }
+
+        if (!pixPayload) {
+          const pixKey = settings?.pixKey ? settings.pixKey.trim() : '';
+          if (!pixKey) {
+            return res.status(400).json({ message: 'PIX key not configured' });
+          }
+
+          const merchantName =
+            settings?.pixAccountHolder?.trim() ||
+            context.user?.companyName ||
+            [context.user?.firstName, context.user?.lastName]
+              .filter(Boolean)
+              .join(' ') ||
+            'RECEBEDOR';
+          const merchantCity = context.user?.city || 'BRASIL';
+          const txidBase = `TICKET${ticketRef}`.replace(/[^A-Za-z0-9]/g, '');
+          pixPayload = buildPixPayload({
+            pixKey,
+            amount: amount > 0 ? amount : undefined,
+            merchantName,
+            merchantCity,
+            txid: txidBase.slice(0, 25),
+            description: `Chamado ${ticketRef || 'sem-id'}`,
+          });
+          qrCodeDataUrl = await QRCode.toDataURL(pixPayload, {
+            width: 240,
+            margin: 1,
+          });
+          pixKeyLabel = pixKey;
+        }
+
+        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
+        const paymentUrl =
+          provider === 'mercadopago' && referenceId
+            ? buildPaymentLinkUrl(
+                req,
+                createPaymentLinkToken({
+                  userId,
+                  referenceId,
+                  exp: Date.now() + PAYMENT_LINK_TTL_MS,
+                })
+              )
+            : '';
+
+        const baseMessage = buildPaymentMessage({
+          clientName,
+          ticketRef: ticketRef || 'sem-id',
+          amount,
+          dueDate,
+          pixKey: pixKeyLabel,
+          pixPayload,
+          paymentUrl,
+        });
+
+        const customMessage =
+          typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+        const messageBody = customMessage || baseMessage;
+        const messageHtml = messageBody
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => `<p>${line}</p>`)
+          .join('');
+
+        const html = `
+          <div style="font-family: Arial, sans-serif; color: #111827;">
+            ${messageHtml}
+            ${
+              paymentUrl
+                ? `<p><strong>Pagar online:</strong> <a href="${paymentUrl}">${paymentUrl}</a></p>`
+                : ''
+            }
+            ${
+              pixKeyLabel
+                ? `<p><strong>Chave PIX:</strong> ${pixKeyLabel}</p>`
+                : ''
+            }
+            <p><strong>Copia e cola:</strong></p>
+            <p style="font-family: monospace; font-size: 12px; word-break: break-all;">${pixPayload}</p>
+            <p><strong>QR Code PIX:</strong></p>
+            <img src="${qrCodeDataUrl}" alt="QR Code PIX" style="width: 220px; height: 220px;" />
+          </div>
+        `;
+
+        const emailSubject = `Cobranca - Chamado ${ticketRef || 'sem-id'}`;
+        const sendResult = await sendEmail({
+          to: email,
+          subject: emailSubject,
+          html,
+        });
+        if (!sendResult.success) {
+          return res.status(500).json({
+            message: sendResult.error || 'Failed to send email',
+          });
+        }
+
+        res.json({ success: true, provider, paymentId });
+      } catch (error: any) {
+        console.error(
+          '[POST /api/tickets/:id/send-payment-link-email] Error:',
+          error
+        );
+        res.status(500).json({
+          message: error?.message || 'Failed to send payment email',
+        });
+      }
+    }
+  );
+
+  app.get('/api/public/payment-links/:token', async (req: any, res) => {
+    try {
+      const token =
+        typeof req.params?.token === 'string' ? req.params.token.trim() : '';
+      if (!token) {
+        return res.status(400).json({ message: 'Token invalido.' });
+      }
+
+      const payload = parsePaymentLinkToken(token);
+      if (!payload) {
+        return res
+          .status(400)
+          .json({ message: 'Link de pagamento invalido ou expirado.' });
+      }
+
+      const context = await resolvePaymentContext(
+        payload.userId,
+        payload.referenceId
+      );
+      if (context.error) {
+        return res
+          .status(context.error.status)
+          .json({ message: context.error.message });
+      }
+
+      const ticket = context.ticket as any;
+      const record = context.record as any;
+      const client = context.client as any;
+      const amount = coerceNumber(
+        record?.amount ?? ticket?.totalAmount ?? ticket?.ticketValue ?? 0
+      );
+      const dueDateValue =
+        record?.dueDate ?? ticket?.paymentDate ?? ticket?.dueDate ?? null;
+      const dueDate = dueDateValue ? formatDate(dueDateValue) : null;
+      const ticketRef =
+        ticket?.ticketNumber ||
+        ticket?.id?.slice(0, 8) ||
+        record?.id?.slice(0, 8) ||
+        '';
+      const description =
+        record?.description ||
+        ticket?.description ||
+        `Chamado ${ticketRef || 'sem-id'}`;
+
+      const integration = await storage.getPaymentIntegration(
+        payload.userId,
+        'mercadopago'
+      );
+      const rawExpiresAt = integration?.tokenExpiresAt
+        ? new Date(integration.tokenExpiresAt)
+        : null;
+      const isExpired = rawExpiresAt
+        ? rawExpiresAt.getTime() <= Date.now() + 60_000
+        : false;
+      const mpConnected =
+        !!integration?.accessToken &&
+        !isExpired &&
+        (integration?.status === 'connected' || integration?.status === 'active');
+
+      res.json({
+        tokenExpiresAt: new Date(payload.exp).toISOString(),
+        ticketRef,
+        amount,
+        dueDate,
+        description,
+        recordStatus: record?.status || null,
+        client: {
+          name: client?.name || null,
+          email: client?.email || null,
+          document: client?.document || null,
+          phone: client?.phone || null,
+        },
+        company: {
+          name: context.user?.companyName || null,
+          logoUrl: context.user?.companyLogoUrl || null,
+        },
+        mercadoPago: {
+          connected: mpConnected,
+          status: integration?.status || null,
+          publicKey: integration?.publicKey || null,
+        },
+      });
+    } catch (error) {
+      console.error('[GET /api/public/payment-links/:token] Error:', error);
+      res.status(500).json({
+        message: 'Falha ao carregar o link de pagamento.',
+      });
+    }
+  });
+
+  app.post(
+    '/api/public/payment-links/:token/mercadopago',
+    async (req: any, res) => {
+      try {
+        const token =
+          typeof req.params?.token === 'string' ? req.params.token.trim() : '';
+        if (!token) {
+          return res.status(400).json({ message: 'Token invalido.' });
+        }
+
+        const payload = parsePaymentLinkToken(token);
+        if (!payload) {
+          return res
+            .status(400)
+            .json({ message: 'Link de pagamento invalido ou expirado.' });
+        }
+
+        const context = await resolvePaymentContext(
+          payload.userId,
+          payload.referenceId
+        );
+        if (context.error) {
+          return res
+            .status(context.error.status)
+            .json({ message: context.error.message });
+        }
+
+        const tokenInfo = await getMercadoPagoAccessToken(payload.userId);
+        if (!tokenInfo?.accessToken) {
+          return res
+            .status(400)
+            .json({ message: 'Mercado Pago nao conectado.' });
+        }
+
+        const ticket = context.ticket as any;
+        const record = context.record as any;
+        const client = context.client as any;
+
+        const formData = req.body?.formData || req.body || {};
+        const paymentMethodId =
+          formData.payment_method_id ||
+          formData.paymentMethodId ||
+          formData.paymentMethod ||
+          '';
+
+        if (!paymentMethodId) {
+          return res.status(400).json({
+            message: 'Metodo de pagamento nao informado.',
+          });
+        }
+
+        const amount = coerceNumber(
+          formData.transaction_amount ??
+            formData.transactionAmount ??
+            record?.amount ??
+            ticket?.totalAmount ??
+            ticket?.ticketValue ??
+            0
+        );
+        if (!amount || amount <= 0) {
+          return res.status(400).json({
+            message: 'Valor invalido para pagamento.',
+          });
+        }
+
+        const ticketRef =
+          ticket?.ticketNumber ||
+          ticket?.id?.slice(0, 8) ||
+          record?.id?.slice(0, 8) ||
+          '';
+        const description =
+          record?.description ||
+          ticket?.description ||
+          `Chamado ${ticketRef || 'sem-id'}`;
+
+        const payerFromForm = formData.payer || {};
+        const payerEmail =
+          payerFromForm.email ||
+          formData.payer_email ||
+          formData.email ||
+          client?.email ||
+          context.user?.email ||
+          '';
+        if (!payerEmail) {
+          return res.status(400).json({
+            message: 'Email do pagador obrigatorio.',
+          });
+        }
+
+        const identificationFromForm =
+          payerFromForm.identification || formData.identification || {};
+        const documentNumber = normalizeDocumentValue(
+          identificationFromForm.number ||
+            identificationFromForm.value ||
+            formData.document ||
+            client?.document ||
+            ''
+        );
+        const documentType =
+          identificationFromForm.type ||
+          (documentNumber.length === 11
+            ? 'CPF'
+            : documentNumber.length === 14
+              ? 'CNPJ'
+              : null);
+        if (!documentType) {
+          return res.status(400).json({
+            message: 'CPF ou CNPJ do pagador obrigatorio.',
+          });
+        }
+
+        const paymentPayload: Record<string, any> = {
+          transaction_amount: amount,
+          description,
+          payment_method_id: paymentMethodId,
+          external_reference: ticketRef || record?.id || ticket?.id,
+          payer: {
+            email: payerEmail,
+            identification: {
+              type: documentType,
+              number: documentNumber,
+            },
+          },
+        };
+
+        const payerFullName =
+          payerFromForm.first_name ||
+          payerFromForm.firstName ||
+          payerFromForm.name ||
+          client?.name ||
+          [context.user?.firstName, context.user?.lastName]
+            .filter(Boolean)
+            .join(' ') ||
+          'Cliente';
+        const nameParts = payerFullName.trim().split(/\s+/);
+        paymentPayload.payer.first_name = nameParts.shift() || 'Cliente';
+        paymentPayload.payer.last_name = nameParts.join(' ') || 'Cliente';
+
+        if (formData.token) {
+          paymentPayload.token = formData.token;
+        }
+        if (formData.issuer_id) {
+          paymentPayload.issuer_id = formData.issuer_id;
+        }
+        if (formData.installments) {
+          paymentPayload.installments = Number(formData.installments);
+        }
+
+        const paymentData = await createMercadoPagoPayment(
+          tokenInfo.accessToken,
+          paymentPayload
+        );
+
+        const normalizedStatus = String(paymentData?.status || '');
+        if (
+          record &&
+          (normalizedStatus === 'approved' || normalizedStatus === 'accredited')
+        ) {
+          const paidAt = new Date().toISOString();
+          await storage.updateFinancialRecord(record.id, {
+            status: 'paid',
+            paidAt,
+          });
+          if (record.ticketId) {
+            await storage.updateTicket(record.ticketId, {
+              paymentDate: paidAt,
+            });
+          }
+        }
+
+        const transactionData =
+          paymentData?.point_of_interaction?.transaction_data || {};
+        const pixPayload = transactionData.qr_code || null;
+        const qrCodeBase64 = transactionData.qr_code_base64 || '';
+        const qrCodeDataUrl = qrCodeBase64
+          ? `data:image/png;base64,${qrCodeBase64}`
+          : null;
+
+        res.json({
+          status: paymentData?.status || null,
+          statusDetail: paymentData?.status_detail || null,
+          paymentId: paymentData?.id || null,
+          pixPayload,
+          qrCodeDataUrl,
+        });
+      } catch (error: any) {
+        console.error(
+          '[POST /api/public/payment-links/:token/mercadopago] Error:',
+          error
+        );
+        res.status(500).json({
+          message: error?.message || 'Falha ao processar pagamento.',
+        });
+      }
+    }
+  );
 
   app.post(
     '/api/tickets/:id/receive-payment',
@@ -4167,6 +5494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         city: (user as any).city,
         state: (user as any).state,
         phone: (user as any).phone,
+        birthDate: (user as any).birthDate,
         companyName: (user as any).companyName,
         sessionUser: {
           isProfile: (req.session?.user as any)?.isProfile,
@@ -4188,7 +5516,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Garantir que sempre retornamos JSON
       res.setHeader('Content-Type', 'application/json');
 
-      const { email, password, userType, firstName, lastName } = req.body;
+      const {
+        email,
+        password,
+        userType,
+        firstName,
+        lastName,
+        companyName,
+        phone,
+        cpf,
+        cnpj,
+      } = req.body;
 
       // Validação básica
       if (!email || !password) {
@@ -4213,6 +5551,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .json({ message: 'Senha deve ter no mínimo 6 caracteres' });
       }
 
+      const trimmedCompanyName =
+        typeof companyName === 'string' ? companyName.trim() : '';
+      const normalizedPhone =
+        typeof phone === 'string' ? phone.replace(/\D/g, '') : '';
+      const incomingCpf = cpf ? normalizeDocumentValue(cpf) : '';
+      const incomingCnpj = cnpj ? normalizeDocumentValue(cnpj) : '';
+
+      if (!trimmedCompanyName) {
+        return res
+          .status(400)
+          .json({ message: 'Nome da empresa ? obrigat?rio' });
+      }
+
+      if (!normalizedPhone || normalizedPhone.length < 10) {
+        return res
+          .status(400)
+          .json({ message: 'Telefone com DDD ? obrigat?rio' });
+      }
+
+      if (!incomingCpf && !incomingCnpj) {
+        return res
+          .status(400)
+          .json({ message: 'CPF ou CNPJ s?o obrigat?rios' });
+      }
+
+      if (incomingCpf && incomingCnpj) {
+        return res.status(400).json({
+          message: 'Informe apenas um documento (CPF ou CNPJ).',
+        });
+      }
+
       // Normalizar userType para determinar role
       const normalizedUserType = (userType || '').toLowerCase();
       const role =
@@ -4225,6 +5594,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let existingUser;
       let isGoogleAccount = false;
       try {
+        if (incomingCpf) {
+          const existingByCpf = await findUserByDocument(incomingCpf, 'cpf');
+          if (existingByCpf) {
+            return res.status(409).json({
+              message: 'CPF ja cadastrado em outra conta.',
+              code: 'CPF_ALREADY_USED',
+            });
+          }
+        }
+
+        if (incomingCnpj) {
+          const existingByCnpj = await findUserByDocument(incomingCnpj, 'cnpj');
+          if (existingByCnpj) {
+            return res.status(409).json({
+              message: 'CNPJ ja cadastrado em outra conta.',
+              code: 'CNPJ_ALREADY_USED',
+            });
+          }
+        }
+
         // Primeiro: buscar por email normalizado (sem considerar +role)
         // Isso pega contas Google que não têm o formato email+role@domain.com
         const userByEmail = await storage.getUserByEmail(normalizedEmail);
@@ -4347,6 +5736,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: uniqueEmail, // Usar email único no banco
         firstName: firstName || emailParts[0] || 'Usuário',
         lastName: lastName || '',
+        companyName: trimmedCompanyName,
+        phone: normalizedPhone,
+        cpf: incomingCpf || null,
+        cnpj: incomingCnpj || null,
         role: role as any, // Usar role no novo formato (tech/empresa)
         trialDeviceId: trialDeviceId || null,
         trialIp: trialIp || null,
@@ -5577,6 +6970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         neighborhood,
         city,
         state,
+        kycRequired,
       } = req.body;
 
       const existingUser = await storage.getUser(userId);
@@ -5694,6 +7088,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(409).json({
             message: 'Este email ja possui CNPJ cadastrado.',
             code: 'EMAIL_CNPJ_CONFLICT',
+          });
+        }
+      }
+
+      if (kycRequired) {
+        const resolveString = (value: any, fallback: any) => {
+          if (value !== undefined) {
+            return typeof value === 'string' ? value.trim() : value;
+          }
+          return typeof fallback === 'string' ? fallback.trim() : fallback;
+        };
+
+        const documentKind =
+          incomingCpf || existingCpf
+            ? 'cpf'
+            : incomingCnpj || existingCnpj
+              ? 'cnpj'
+              : null;
+        const resolvedDocument =
+          documentKind === 'cpf'
+            ? incomingCpf || existingCpf
+            : documentKind === 'cnpj'
+              ? incomingCnpj || existingCnpj
+              : '';
+
+        const resolvedFirstName = resolveString(firstName, existingUser.firstName);
+        const resolvedLastName = resolveString(lastName, existingUser.lastName);
+        const resolvedCompanyName = resolveString(companyName, existingUser.companyName);
+        const resolvedPhone = resolveString(phone, existingUser.phone);
+        const resolvedZipCode = resolveString(zipCode, (existingUser as any).zipCode);
+        const resolvedStreet = resolveString(
+          streetAddress,
+          (existingUser as any).streetAddress
+        );
+        const resolvedNumber = resolveString(
+          addressNumber,
+          (existingUser as any).addressNumber
+        );
+        const resolvedNeighborhood = resolveString(
+          neighborhood,
+          (existingUser as any).neighborhood
+        );
+        const resolvedCity = resolveString(city, (existingUser as any).city);
+        const resolvedState = resolveString(state, (existingUser as any).state);
+        const resolvedBirthDate =
+          birthDate !== undefined ? birthDate : (existingUser as any).birthDate;
+
+        const missingFields: string[] = [];
+
+        if (!resolvedFirstName) missingFields.push('firstName');
+        if (!resolvedLastName) missingFields.push('lastName');
+        if (!resolvedCompanyName) missingFields.push('companyName');
+        if (!resolvedDocument) missingFields.push('document');
+
+        const phoneDigits =
+          typeof resolvedPhone === 'string'
+            ? resolvedPhone.replace(/\D/g, '')
+            : '';
+        if (!phoneDigits || phoneDigits.length < 10) {
+          missingFields.push('phone');
+        }
+
+        const zipDigits =
+          typeof resolvedZipCode === 'string'
+            ? resolvedZipCode.replace(/\D/g, '')
+            : '';
+        if (!zipDigits || zipDigits.length < 8) missingFields.push('zipCode');
+        if (!resolvedStreet) missingFields.push('streetAddress');
+        if (!resolvedNumber) missingFields.push('addressNumber');
+        if (!resolvedNeighborhood) missingFields.push('neighborhood');
+        if (!resolvedCity) missingFields.push('city');
+        if (!resolvedState || resolvedState.length < 2) missingFields.push('state');
+
+        if (documentKind === 'cpf' && !resolvedBirthDate) {
+          missingFields.push('birthDate');
+        }
+
+        if (missingFields.length > 0) {
+          return res.status(400).json({
+            message: 'Dados obrigatorios incompletos para integracao.',
+            missingFields,
           });
         }
       }
@@ -11031,9 +12506,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return httpServer;
 }
-
-
-
 
 
 

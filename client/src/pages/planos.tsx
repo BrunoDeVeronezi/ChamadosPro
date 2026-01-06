@@ -4,23 +4,29 @@ import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
+  CalendarDays,
   Check,
+  CreditCard,
+  FileText,
   Loader2,
   ShieldCheck,
   Sparkles,
-  X,
+  Timer,
+  Wallet,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -54,32 +60,13 @@ interface Subscription {
   hasSubscription?: boolean;
 }
 
-type FeatureItem = {
-  label: string;
-  included: boolean;
-};
-
-const trialFeatures: FeatureItem[] = [
-  { label: 'Cadastro de clientes e chamados', included: true },
-  { label: 'Agenda e agendamento publico para clientes', included: true },
-  { label: 'Upload de logos e imagens', included: true },
-  { label: 'Ate 10 clientes cadastrados', included: true },
-  { label: 'Relatorios avancados e analytics', included: false },
-  { label: 'Exportacao e importacao de dados', included: false },
-  { label: 'PDFs (RAT, recibos e relatorios)', included: false },
-  { label: 'Envio por WhatsApp', included: false },
-  { label: 'Integracao Google Calendar', included: false },
-];
-
-const paidFeatures: FeatureItem[] = [
-  { label: 'Clientes ilimitados', included: true },
-  { label: 'Agenda e agendamento publico para clientes', included: true },
-  { label: 'Upload de logos e imagens', included: true },
-  { label: 'Exportacao e importacao de dados', included: true },
-  { label: 'PDFs (RAT, recibos e relatorios)', included: true },
-  { label: 'Envio por WhatsApp', included: true },
-  { label: 'Relatorios avancados e analytics', included: true },
-  { label: 'Integracao Google Calendar', included: true },
+const planHighlights = [
+  'Usuarios ilimitados e plano completo',
+  'Gestao de chamados e agenda integrada',
+  'Financeiro com recibos e PDFs ilimitados',
+  'Relatorios avancados e dashboards',
+  'Integracao com Google Calendar',
+  'Suporte prioritario e atualizacoes constantes',
 ];
 
 const containerVariants = {
@@ -109,6 +96,14 @@ const formatDateLabel = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString('pt-BR');
+};
+
+const getDaysLeft = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffMs = date.getTime() - Date.now();
+  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 };
 
 const formatPrice = (price: string) => {
@@ -258,9 +253,6 @@ export default function Planos() {
 
   const paidPlan = plans?.[0] ?? null;
   const planName = paidPlan?.name?.trim() || 'Plano Tecnico';
-  const planPriceLabel = paidPlan?.price
-    ? formatPrice(paidPlan.price)
-    : formatPrice('35');
 
   const planStatus = user?.planStatus;
   const isTrial = planStatus === 'trial';
@@ -269,8 +261,96 @@ export default function Planos() {
   const trialDaysLeft =
     typeof user?.trialDaysLeft === 'number' ? user.trialDaysLeft : null;
   const trialEndsLabel = formatDateLabel(user?.trialEndsAt);
-  const trialDeleteLabel = formatDateLabel(user?.trialDeleteAt);
   const isSubscriptionActive = currentSubscription?.status === 'active';
+  const computedTrialDaysLeft =
+    typeof trialDaysLeft === 'number'
+      ? trialDaysLeft
+      : getDaysLeft(user?.trialEndsAt);
+  const trialTotalDays = 30;
+  const trialProgress =
+    isTrial && computedTrialDaysLeft !== null
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            ((trialTotalDays - computedTrialDaysLeft) / trialTotalDays) * 100
+          )
+        )
+      : isSubscriptionActive || isActive
+      ? 100
+      : 0;
+  const statusLabel = isExpired
+    ? 'Expirado'
+    : isTrial
+    ? 'Ativo (Trial)'
+    : isSubscriptionActive || isActive
+    ? 'Ativo'
+    : 'Inativo';
+  const statusTone = isExpired
+    ? 'text-red-500 bg-red-500/10 dark:bg-red-500/20'
+    : isTrial
+    ? 'text-amber-500 bg-amber-500/10 dark:bg-amber-500/20'
+    : 'text-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20';
+  const nextBillingLabel =
+    (isTrial ? trialEndsLabel : formatDateLabel(currentSubscription?.endDate)) ||
+    'A definir';
+  const monthlyPriceLabel = formatPrice('35');
+  const billingCycleValue = paidPlan?.billingCycle?.toLowerCase();
+  const billingCycleLabel = billingCycleValue?.includes('year')
+    ? 'Anual'
+    : 'Mensal';
+  const billingHistory = currentSubscription
+    ? [
+        {
+          id: currentSubscription.id,
+          date: currentSubscription.startDate,
+          description: `${planName} - ${billingCycleLabel}`,
+          amount: monthlyPriceLabel,
+          status: currentSubscription.status,
+        },
+      ]
+    : [];
+  const trialBadgeLabel = isTrial
+    ? computedTrialDaysLeft !== null
+      ? `${computedTrialDaysLeft} dias restantes`
+      : 'Trial ativo'
+    : isSubscriptionActive || isActive
+    ? 'Assinatura ativa'
+    : 'Plano inativo';
+  const trialMessage = isTrial
+    ? computedTrialDaysLeft !== null
+      ? `Restam ${computedTrialDaysLeft} dias para o fim do seu teste gratuito.`
+      : 'Seu periodo de teste esta ativo.'
+    : isSubscriptionActive || isActive
+    ? 'Seu plano esta ativo e pronto para uso total.'
+    : 'Assine o plano mensal para liberar todas as funcionalidades.';
+  const statusDescription = isExpired
+    ? 'Seu acesso expirou. Renove para continuar usando.'
+    : isTrial
+    ? 'Trial ativo com todas as funcoes principais.'
+    : isSubscriptionActive || isActive
+    ? 'Assinatura ativa com acesso completo.'
+    : 'Nenhuma assinatura ativa no momento.';
+  const paymentMethodTitle =
+    currentSubscription?.paymentGateway === 'stripe'
+      ? 'Pagamento via Stripe'
+      : 'Nenhum metodo cadastrado';
+  const paymentMethodSubtitle =
+    currentSubscription?.paymentGateway === 'stripe'
+      ? 'Atualize cartao ou dados de cobranca no portal.'
+      : 'Adicione um metodo para manter a assinatura ativa.';
+  const billingStatusLabel: Record<string, string> = {
+    active: 'Pago',
+    pending: 'Pendente',
+    cancelled: 'Cancelado',
+    expired: 'Expirado',
+  };
+  const billingStatusTone: Record<string, string> = {
+    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+    pending: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
+    cancelled: 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200',
+    expired: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200',
+  };
 
   const handleSubscribe = () => {
     if (!paidPlan) {
@@ -285,149 +365,203 @@ export default function Planos() {
     subscribeMutation.mutate(paidPlan.id);
   };
 
+  const handleOpenBillingPortal = () => {
+    if (currentSubscription?.paymentGateway === 'stripe') {
+      billingPortalMutation.mutate();
+      return;
+    }
+    toast({
+      title: 'Portal indisponivel',
+      description: 'Gerencie a assinatura entrando em contato com o suporte.',
+    });
+  };
+
+  const handleCancelSubscription = () => {
+    if (!isSubscriptionActive && !isTrial) {
+      toast({
+        title: 'Nenhuma assinatura ativa',
+        description: 'Nao ha assinatura ativa para cancelar.',
+      });
+      return;
+    }
+    handleOpenBillingPortal();
+  };
+
   return (
-    <div className='relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#0b1120] dark:text-white [--plan-primary:#2563eb] [--plan-accent:#14b8a6] [--plan-warn:#f97316]'>
-      <div className='pointer-events-none absolute -top-32 right-0 h-80 w-80 rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.22),transparent_70%)]' />
-      <div className='pointer-events-none absolute left-0 top-32 h-96 w-96 rounded-full bg-[radial-gradient(circle_at_center,rgba(20,184,166,0.18),transparent_70%)]' />
-      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.4),transparent_45%)] dark:bg-[linear-gradient(120deg,rgba(2,6,23,0.1),transparent_45%)]' />
+    <div className='relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#0b1220] dark:text-slate-100 [--plan-primary:#1d4ed8] [--plan-accent:#0ea5e9]'>
+      <div className='pointer-events-none absolute -top-24 right-0 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(29,78,216,0.22),transparent_70%)]' />
+      <div className='pointer-events-none absolute left-0 top-32 h-96 w-96 rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.18),transparent_70%)]' />
+      <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.65),transparent_45%)] dark:bg-[linear-gradient(120deg,rgba(2,6,23,0.15),transparent_45%)]' />
 
       <main className='relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 lg:px-8'>
         <motion.div
           variants={containerVariants}
           initial='hidden'
           animate='show'
-          className='space-y-10'
+          className='space-y-8'
         >
-          <motion.div
-            variants={itemVariants}
-            className='flex flex-wrap items-center justify-between gap-4'
-          >
-            <Button
-              variant='ghost'
-              className='gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-              onClick={() => navigate('/')}
-            >
-              <ArrowLeft className='h-4 w-4' />
-              Voltar ao painel
-            </Button>
-            {isSubscriptionActive && (
-              <Badge className='bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'>
-                Assinatura ativa
-              </Badge>
-            )}
+          <motion.div variants={itemVariants} className='space-y-4'>
+            <div className='text-sm text-slate-500 dark:text-slate-400'>
+              Home <span className='px-2'>/</span> Configuracoes{' '}
+              <span className='px-2'>/</span>{' '}
+              <span className='text-slate-900 dark:text-white'>
+                Assinatura
+              </span>
+            </div>
+            <div className='space-y-2'>
+              <h1 className='text-3xl font-semibold tracking-tight sm:text-4xl'>
+                Gerenciamento de Assinatura
+              </h1>
+              <p className='text-base text-slate-600 dark:text-slate-300'>
+                Gerencie seu plano atual, historico de cobrancas e metodos de
+                pagamento.
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card className='border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <CardContent className='space-y-4 p-6'>
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <div className='flex items-center gap-2 text-sm font-semibold'>
+                    <span className='flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300'>
+                      <Timer className='h-4 w-4' />
+                    </span>
+                    <span>
+                      {isTrial
+                        ? 'Periodo de Teste (Trial)'
+                        : 'Ciclo da Assinatura'}
+                    </span>
+                  </div>
+                  <Badge className='bg-slate-900 text-white dark:bg-white/10 dark:text-white'>
+                    {trialBadgeLabel}
+                  </Badge>
+                </div>
+                <Progress
+                  value={trialProgress}
+                  className='h-2 bg-slate-100 dark:bg-slate-800'
+                />
+                <p className='text-sm text-slate-600 dark:text-slate-300'>
+                  {trialMessage}
+                </p>
+              </CardContent>
+            </Card>
           </motion.div>
 
           <motion.div
             variants={itemVariants}
-            className='grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-center'
+            className='grid gap-4 md:grid-cols-3'
           >
-            <div className='space-y-4'>
-              <Badge className='w-fit bg-[color:var(--plan-primary)] text-white'>
+            <Card className='border border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <CardContent className='p-5'>
+                <div className='flex items-start gap-3'>
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl ${statusTone}`}
+                  >
+                    <ShieldCheck className='h-5 w-5' />
+                  </div>
+                  <div className='space-y-1'>
+                    <p className='text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400'>
+                      Status da assinatura
+                    </p>
+                    <p className='text-lg font-semibold'>{statusLabel}</p>
+                    <p className='text-xs text-slate-500 dark:text-slate-400'>
+                      {statusDescription}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className='border border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <CardContent className='p-5'>
+                <div className='flex items-start gap-3'>
+                  <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-100'>
+                    <CalendarDays className='h-5 w-5' />
+                  </div>
+                  <div className='space-y-1'>
+                    <p className='text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400'>
+                      Proxima cobranca
+                    </p>
+                    <p className='text-lg font-semibold'>{nextBillingLabel}</p>
+                    <p className='text-xs text-slate-500 dark:text-slate-400'>
+                      Referente ao ciclo mensal atual
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className='border border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <CardContent className='p-5'>
+                <div className='flex items-start gap-3'>
+                  <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-100'>
+                    <Wallet className='h-5 w-5' />
+                  </div>
+                  <div className='space-y-1'>
+                    <p className='text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400'>
+                      Valor mensal
+                    </p>
+                    <p className='text-lg font-semibold'>
+                      {monthlyPriceLabel}
+                    </p>
+                    <p className='text-xs text-slate-500 dark:text-slate-400'>
+                      Plano unico com renovacao mensal
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className='space-y-4'>
+            <div className='flex flex-wrap items-center justify-between gap-3'>
+              <h2 className='text-xl font-semibold'>Planos Disponiveis</h2>
+              <Badge className='bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200'>
                 Plano unico
               </Badge>
-              <div className='space-y-3'>
-                <h1 className='text-3xl font-semibold leading-tight sm:text-4xl'>
-                  Plano tecnico para liberar todo o ChamadosPro
-                </h1>
-                <p className='text-base text-slate-600 dark:text-slate-300'>
-                  Teste gratis por 30 dias com limites claros. Depois disso,
-                  assine o plano pago para continuar usando o sistema.
-                </p>
-              </div>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-                {isSubscriptionActive ? (
-                  <Button
-                    variant='outline'
-                    onClick={() => {
-                      if (currentSubscription?.paymentGateway === 'stripe') {
-                        billingPortalMutation.mutate();
-                        return;
-                      }
-                      toast({
-                        title: 'Gerenciar assinatura',
-                        description:
-                          'Portal disponivel apenas para assinaturas Stripe.',
-                      });
-                    }}
-                    disabled={billingPortalMutation.isPending}
-                  >
-                    {billingPortalMutation.isPending
-                      ? 'Abrindo portal...'
-                      : 'Gerenciar assinatura'}
-                  </Button>
-                ) : (
-                  <Button
-                    className='gap-2 bg-[color:var(--plan-primary)] text-white hover:bg-blue-700'
-                    onClick={handleSubscribe}
-                    disabled={
-                      !paidPlan ||
-                      subscribeMutation.isPending ||
-                      selectedPlan === paidPlan?.id
-                    }
-                  >
-                    {subscribeMutation.isPending &&
-                    selectedPlan === paidPlan?.id ? (
-                      <>
-                        <Loader2 className='h-4 w-4 animate-spin' />
-                        Assinando...
-                      </>
-                    ) : (
-                      <>
-                        Assinar por {planPriceLabel}/mes
-                        <ArrowRight className='h-4 w-4' />
-                      </>
-                    )}
-                  </Button>
-                )}
-                <Button
-                  variant='ghost'
-                  className='gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
-                  onClick={() => navigate('/planos')}
-                >
-                  Ver detalhes do plano
-                </Button>
-              </div>
-              {isTrial && (
-                <div className='text-xs text-slate-500 dark:text-slate-400'>
-                  Se nao assinar ate 5 dias apos o fim do trial, o login sera
-                  excluido.
-                </div>
-              )}
             </div>
-
-            <Card className='relative overflow-hidden border border-slate-200/70 bg-white/80 shadow-lg backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/40'>
-              <div className='pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.2),transparent_70%)]' />
-              <CardHeader className='space-y-2'>
-                <div className='flex items-center gap-2'>
-                  <Sparkles className='h-5 w-5 text-[color:var(--plan-primary)]' />
-                  <CardTitle>{planName}</CardTitle>
-                </div>
-                <CardDescription>
-                  Plano pago unico com liberacao total.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='rounded-xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-slate-900 dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-white'>
-                  <div className='text-sm text-slate-500 dark:text-slate-300'>
-                    Valor mensal
+            <Card className='relative overflow-hidden border border-slate-200/70 bg-white/90 shadow-lg dark:border-slate-800/60 dark:bg-slate-950/50'>
+              <div className='pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-[radial-gradient(circle_at_center,rgba(29,78,216,0.2),transparent_70%)]' />
+              <CardContent className='relative space-y-5 p-6'>
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <div className='flex items-center gap-3'>
+                    <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300'>
+                      <Sparkles className='h-5 w-5' />
+                    </div>
+                    <div>
+                      <p className='text-lg font-semibold'>{planName}</p>
+                      <p className='text-xs text-slate-500 dark:text-slate-300'>
+                        Plano mensal com acesso total ao sistema
+                      </p>
+                    </div>
                   </div>
-                  <div className='text-3xl font-semibold'>
-                    {planPriceLabel}
-                    <span className='text-base font-normal text-slate-500 dark:text-slate-300'>
-                      /mes
-                    </span>
-                  </div>
+                  <Badge className='bg-[color:var(--plan-primary)] text-white'>
+                    POPULAR
+                  </Badge>
                 </div>
-                <div className='space-y-3'>
-                  {paidFeatures.slice(0, 4).map((feature) => (
-                    <div key={feature.label} className='flex items-start gap-3'>
+                <div className='flex items-end gap-2'>
+                  <span className='text-3xl font-semibold'>
+                    {monthlyPriceLabel}
+                  </span>
+                  <span className='text-sm text-slate-500 dark:text-slate-300'>
+                    /mes
+                  </span>
+                </div>
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  {planHighlights.map((feature) => (
+                    <div key={feature} className='flex items-start gap-3'>
                       <Check className='mt-0.5 h-5 w-5 text-emerald-500' />
                       <span className='text-sm text-slate-600 dark:text-slate-200'>
-                        {feature.label}
+                        {feature}
                       </span>
                     </div>
                   ))}
                 </div>
+                {!paidPlan && (
+                  <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200'>
+                    Nenhum plano ativo foi encontrado. Verifique o cadastro no
+                    painel administrativo.
+                  </div>
+                )}
                 <Button
                   className='w-full gap-2 bg-[color:var(--plan-primary)] text-white hover:bg-blue-700'
                   onClick={handleSubscribe}
@@ -438,183 +572,172 @@ export default function Planos() {
                     selectedPlan === paidPlan?.id
                   }
                 >
-                  {isSubscriptionActive
-                    ? 'Plano ativo'
-                    : 'Assinar agora'}
+                  {subscribeMutation.isPending &&
+                  selectedPlan === paidPlan?.id ? (
+                    <>
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                      Assinando...
+                    </>
+                  ) : isSubscriptionActive ? (
+                    'Seu plano atual'
+                  ) : (
+                    <>
+                      Assinar agora
+                      <ArrowRight className='h-4 w-4' />
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
           </motion.div>
 
-          {(isTrial || isExpired || isActive) && (
-            <motion.div variants={itemVariants}>
-              <Card
-                className={`border ${
-                  isExpired
-                    ? 'border-red-200/70 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/30'
-                    : isTrial
-                    ? 'border-amber-200/70 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20'
-                    : 'border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/20'
-                }`}
-              >
-                <CardContent className='flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between'>
-                  <div className='flex items-start gap-4'>
-                    <div className='flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-slate-800 shadow-sm dark:bg-slate-900/60 dark:text-white'>
-                      {isExpired ? (
-                        <AlertTriangle className='h-5 w-5 text-red-500' />
-                      ) : (
-                        <ShieldCheck
-                          className={`h-5 w-5 ${
-                            isTrial
-                              ? 'text-amber-500'
-                              : 'text-emerald-500'
-                          }`}
-                        />
-                      )}
-                    </div>
-                    <div className='space-y-2'>
-                      <div className='text-base font-semibold'>
-                        {isExpired
-                          ? 'Acesso bloqueado'
-                          : isTrial
-                          ? 'Trial ativo'
-                          : 'Assinatura ativa'}
-                      </div>
-                      <div className='text-sm text-slate-600 dark:text-slate-300'>
-                        {isExpired
-                          ? 'Seu trial terminou. Assine para liberar o menu.'
-                          : isTrial
-                          ? 'Use o trial por 30 dias com limites de exportacao.'
-                          : 'Tudo liberado enquanto a assinatura estiver ativa.'}
-                      </div>
-                      <div className='flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400'>
-                        {trialEndsLabel && (
-                          <span>Fim do trial: {trialEndsLabel}</span>
-                        )}
-                        {trialDeleteLabel && (
-                          <span>Exclusao do login: {trialDeleteLabel}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {isTrial && trialDaysLeft !== null && (
-                    <div className='rounded-xl border border-amber-200 bg-white/70 px-4 py-3 text-center text-amber-700 shadow-sm dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200'>
-                      <div className='text-2xl font-semibold'>
-                        {trialDaysLeft}
-                      </div>
-                      <div className='text-[11px] uppercase tracking-wide'>
-                        dias restantes
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
           <motion.div
             variants={itemVariants}
-            className='grid gap-6 lg:grid-cols-2'
+            className='grid gap-6 lg:grid-cols-[0.9fr_1.1fr]'
           >
             <Card className='border border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-950/40'>
-              <CardHeader className='space-y-2'>
+              <CardContent className='space-y-4 p-6'>
                 <div className='flex items-center justify-between gap-2'>
-                  <CardTitle className='text-lg'>Trial gratuito</CardTitle>
-                  <Badge className='bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200'>
-                    30 dias
-                  </Badge>
-                </div>
-                <CardDescription>
-                  Acesso inicial com limites e sem exportacoes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='space-y-3 text-sm'>
-                  {trialFeatures.map((feature) => (
-                    <div key={feature.label} className='flex items-start gap-3'>
-                      {feature.included ? (
-                        <Check className='mt-0.5 h-5 w-5 text-emerald-500' />
-                      ) : (
-                        <X className='mt-0.5 h-5 w-5 text-slate-400' />
-                      )}
-                      <span
-                        className={
-                          feature.included
-                            ? 'text-slate-700 dark:text-slate-200'
-                            : 'text-slate-500 dark:text-slate-400'
-                        }
-                      >
-                        {feature.label}
-                      </span>
+                  <div className='flex items-center gap-3'>
+                    <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-100'>
+                      <CreditCard className='h-5 w-5' />
                     </div>
-                  ))}
+                    <div>
+                      <p className='text-base font-semibold'>
+                        Metodo de Pagamento
+                      </p>
+                      <p className='text-xs text-slate-500 dark:text-slate-300'>
+                        Gerencie dados de cobranca.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                    onClick={handleOpenBillingPortal}
+                    disabled={billingPortalMutation.isPending}
+                  >
+                    {billingPortalMutation.isPending ? 'Abrindo...' : 'Editar'}
+                  </Button>
                 </div>
-                <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 text-xs text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200'>
-                  Tentativas de exportar, gerar PDF ou enviar WhatsApp mostram o
-                  aviso de plano pago.
+                <div className='rounded-xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40'>
+                  <p className='text-sm font-semibold'>{paymentMethodTitle}</p>
+                  <p className='text-xs text-slate-500 dark:text-slate-300'>
+                    {paymentMethodSubtitle}
+                  </p>
+                </div>
+                <div className='text-xs text-slate-500 dark:text-slate-400'>
+                  Cartoes e dados sao gerenciados com seguranca no portal do
+                  provedor.
                 </div>
               </CardContent>
             </Card>
 
-            <Card className='border border-slate-200/70 bg-white/95 shadow-lg dark:border-slate-800/60 dark:bg-slate-950/40'>
-              <CardHeader className='space-y-2'>
-                <div className='flex items-center justify-between gap-2'>
-                  <CardTitle className='text-lg'>{planName}</CardTitle>
-                  <Badge className='bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200'>
-                    Recomendado
-                  </Badge>
-                </div>
-                <CardDescription>
-                  Desbloqueio completo e integracoes liberadas.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-4'>
-                <div className='space-y-3 text-sm'>
-                  {paidFeatures.map((feature) => (
-                    <div key={feature.label} className='flex items-start gap-3'>
-                      <Check className='mt-0.5 h-5 w-5 text-emerald-500' />
-                      <span className='text-slate-700 dark:text-slate-200'>
-                        {feature.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className='flex flex-col gap-3 sm:flex-row'>
+            <Card className='border border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <CardContent className='space-y-4 p-6'>
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <div>
+                    <p className='text-base font-semibold'>
+                      Historico de Cobrancas
+                    </p>
+                    <p className='text-xs text-slate-500 dark:text-slate-300'>
+                      Consulte pagamentos anteriores do plano.
+                    </p>
+                  </div>
                   <Button
-                    className='flex-1 gap-2 bg-[color:var(--plan-primary)] text-white hover:bg-blue-700'
-                    onClick={handleSubscribe}
-                    disabled={
-                      isSubscriptionActive ||
-                      !paidPlan ||
-                      subscribeMutation.isPending ||
-                      selectedPlan === paidPlan?.id
-                    }
+                    variant='ghost'
+                    size='sm'
+                    className='gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                    disabled={billingHistory.length === 0}
                   >
-                    {isSubscriptionActive ? 'Plano ativo' : 'Assinar agora'}
-                    <ArrowRight className='h-4 w-4' />
+                    <FileText className='h-4 w-4' />
+                    Baixar tudo
                   </Button>
-                  <Button
-                    variant='outline'
-                    className='flex-1'
-                    onClick={() => navigate('/')}
-                  >
-                    Voltar ao painel
-                  </Button>
+                </div>
+                <div className='overflow-hidden rounded-xl border border-slate-200/70 dark:border-slate-800/60'>
+                  <Table>
+                    <TableHeader className='bg-slate-100/80 dark:bg-slate-900/50'>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Descricao</TableHead>
+                        <TableHead>Valor</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Fatura</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {billingHistory.length > 0 ? (
+                        billingHistory.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className='text-sm'>
+                              {formatDateLabel(row.date) || '-'}
+                            </TableCell>
+                            <TableCell className='text-sm'>
+                              {row.description}
+                            </TableCell>
+                            <TableCell className='text-sm'>
+                              {row.amount}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  billingStatusTone[row.status] ||
+                                  billingStatusTone.pending
+                                }
+                              >
+                                {billingStatusLabel[row.status] || 'Pendente'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className='text-sm text-slate-400'>
+                              <FileText className='h-4 w-4' />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className='py-6 text-center text-sm text-slate-500 dark:text-slate-400'
+                          >
+                            Nenhuma cobranca registrada ainda.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          {!paidPlan && (
-            <motion.div variants={itemVariants}>
-              <Card className='border border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40'>
-                <CardContent className='p-6 text-sm text-slate-600 dark:text-slate-300'>
-                  Nenhum plano ativo foi encontrado. Verifique o cadastro de
-                  planos no painel administrativo.
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+          <motion.div variants={itemVariants}>
+            <Card className='border border-red-200/70 bg-red-50/70 dark:border-red-900/40 dark:bg-red-950/30'>
+              <CardContent className='flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between'>
+                <div className='flex items-start gap-3'>
+                  <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-300'>
+                    <AlertTriangle className='h-5 w-5' />
+                  </div>
+                  <div>
+                    <p className='text-base font-semibold text-red-700 dark:text-red-200'>
+                      Cancelar Assinatura
+                    </p>
+                    <p className='text-sm text-red-600/80 dark:text-red-300/80'>
+                      Ao cancelar, o acesso premium sera encerrado ao final do
+                      ciclo atual.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant='outline'
+                  className='border-red-300 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-900/40'
+                  onClick={handleCancelSubscription}
+                >
+                  Quero cancelar
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
       </main>
     </div>

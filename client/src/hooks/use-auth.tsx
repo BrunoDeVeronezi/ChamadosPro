@@ -26,6 +26,7 @@ interface User {
   phone?: string | null;
   cpf?: string | null;
   cnpj?: string | null;
+  birthDate?: string | null;
   zipCode?: string | null;
   streetAddress?: string | null;
   addressNumber?: string | null;

@@ -2,40 +2,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Login from '@/pages/login';
-import { useLocation } from 'wouter';
-import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const [, navigate] = useLocation();
-
-  // Verificar se precisa completar cadastro
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
-      // Master admin não precisa completar cadastro
-      if (user.role === 'super_admin') {
-        return;
-      }
-
-      // Verificar se precisa completar cadastro
-      // IMPORTANTE: Usar apenas profileCompleted como condição principal
-      // Se profileCompleted === true, o cadastro foi completado e não deve redirecionar
-      const needsProfileCompletion = !user.profileCompleted;
-
-      // Se precisa completar e não está na página de completar cadastro, redirecionar
-      if (
-        needsProfileCompletion &&
-        window.location.pathname !== '/completar-cadastro'
-      ) {
-        console.log('[ProtectedRoute] Redirecionando para completar cadastro');
-        navigate('/completar-cadastro');
-      }
-    }
-  }, [isLoading, isAuthenticated, user, navigate]);
+  const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -63,19 +36,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isAuthenticated) {
     return <Login />;
-  }
-
-  // Se precisa completar cadastro, não renderizar children (já redirecionou)
-  if (user && user.role !== 'super_admin') {
-    // IMPORTANTE: Usar apenas profileCompleted como condição principal
-    const needsProfileCompletion = !user.profileCompleted;
-
-    if (
-      needsProfileCompletion &&
-      window.location.pathname !== '/completar-cadastro'
-    ) {
-      return null; // Aguardar redirecionamento
-    }
   }
 
   return <>{children}</>;

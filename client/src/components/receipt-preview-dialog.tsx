@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -15,8 +22,11 @@ import {
   Mail, 
   Share2, 
   Download, 
+  Image,
   Loader2, 
   CheckCircle2,
+  MoreHorizontal,
+  MessageCircle,
   Printer,
   Building2
 } from 'lucide-react';
@@ -27,6 +37,9 @@ import { usePaidAccess } from '@/hooks/use-paid-access';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { coerceServiceItems } from '@/utils/service-items';
+import { maskCurrency, unmaskCurrency } from '@/lib/masks';
+import QRCode from 'qrcode';
+import { buildPixPayload } from '@shared/pix';
 
 interface ReceiptData {
   company: {
@@ -70,6 +83,9 @@ interface ReceiptPreviewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   data: ReceiptData;
+  autoShare?: 'whatsapp' | 'share' | null;
+  shareMessage?: string;
+  whatsappPhone?: string;
 }
 
 const normalizeTicketDate = (value?: string) => {
@@ -102,12 +118,23 @@ export function ReceiptPreviewDialog({
   isOpen,
   onClose,
   data,
+  autoShare = null,
+  shareMessage,
+  whatsappPhone,
 }: ReceiptPreviewDialogProps) {
   const { toast } = useToast();
   const { requirePaid } = usePaidAccess();
+  const { data: integrationSettings, isLoading: isIntegrationLoading } =
+    useQuery<{ pixKey?: string | null; pixAccountHolder?: string | null }>({
+      queryKey: ['/api/integration-settings'],
+      enabled: isOpen,
+    });
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isSharingReceipt, setIsSharingReceipt] = useState(false);
+  const [isSharingWhatsAppWeb, setIsSharingWhatsAppWeb] = useState(false);
   const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
+  const [isDownloadingImage, setIsDownloadingImage] = useState(false);
+  const autoShareTriggeredRef = useRef(false);
   const [editableData, setEditableData] = useState<ReceiptData>(() => ({
     ...data,
     ticket: {
@@ -138,13 +165,27 @@ export function ReceiptPreviewDialog({
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  const discountRaw = Number(editableData.ticket.discount ?? 0);
-  const discountAmount =
-    Number.isFinite(discountRaw) && discountRaw > 0 ? discountRaw : 0;
-  const finalAmountRaw = Number(editableData.ticket.amount);
-  const finalAmount = Number.isFinite(finalAmountRaw) ? finalAmountRaw : 0;
-  const originalAmount = finalAmount + discountAmount;
-  const hasDiscount = discountAmount > 0;
+  const numberToCurrencyString = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return '0';
+    return Math.round(value * 100).toString();
+  };
+  const parseCurrencyValue = (value: unknown) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string') {
+      return parseFloat(unmaskCurrency(value)) || 0;
+    }
+    return 0;
+  };
+  const amountValue = parseCurrencyValue(editableData.ticket.amount);
+  const discountValue = Math.max(
+    0,
+    parseCurrencyValue(editableData.ticket.discount)
+  );
+  const originalAmount = amountValue;
+  const finalAmount = Math.max(0, amountValue - discountValue);
+  const hasDiscount = discountValue > 0;
   const kmTotal = Number(editableData.ticket.kmTotal ?? 0);
   const kmRate = Number(editableData.ticket.kmRate ?? 0);
   const extraExpenses = Number(editableData.ticket.extraExpenses ?? 0);
@@ -180,6 +221,89 @@ export function ReceiptPreviewDialog({
     ...extraServiceItems,
   ];
 
+  const normalizePhone = (value?: string | null) =>
+    (value || '').replace(/\D/g, '');
+
+  useEffect(() => {
+    if (!isOpen) {
+      autoShareTriggeredRef.current = false;
+      return;
+    }
+
+    const pixKey = (integrationSettings?.pixKey || '').trim();
+    if (!pixKey) {
+      return;
+    }
+
+    let cancelled = false;
+    const amountToCharge = Math.max(0, finalAmount);
+    const merchantName =
+      integrationSettings?.pixAccountHolder?.trim() ||
+      editableData.company.name ||
+      'RECEBEDOR';
+    const merchantCity = editableData.company.city || 'BRASIL';
+    const ticketId = editableData.ticket.id || '';
+    const txidBase = `RECIBO${ticketId.replace(/[^A-Za-z0-9]/g, '')}`;
+    const pixPayload = buildPixPayload({
+      pixKey,
+      amount: amountToCharge > 0 ? amountToCharge : undefined,
+      merchantName,
+      merchantCity,
+      txid: txidBase.slice(0, 25),
+      description: `Recibo ${ticketId.slice(0, 8) || 'sem-id'}`,
+    });
+
+    if (
+      editableData.pix?.key === pixKey &&
+      editableData.pix?.payload === pixPayload &&
+      editableData.pix?.qrCodeDataUrl
+    ) {
+      return;
+    }
+
+    QRCode.toDataURL(pixPayload, { width: 220, margin: 1 })
+      .then((qrCodeDataUrl) => {
+        if (cancelled) return;
+        setEditableData((prev) => {
+          if (
+            prev.pix?.key === pixKey &&
+            prev.pix?.payload === pixPayload &&
+            prev.pix?.qrCodeDataUrl === qrCodeDataUrl &&
+            prev.pix?.accountHolder === merchantName
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            pix: {
+              key: pixKey,
+              payload: pixPayload,
+              qrCodeDataUrl,
+              accountHolder: merchantName,
+            },
+          };
+        });
+      })
+      .catch((error) => {
+        console.warn('Erro ao gerar QR Code PIX:', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    integrationSettings?.pixKey,
+    integrationSettings?.pixAccountHolder,
+    editableData.company.city,
+    editableData.company.name,
+    editableData.ticket.id,
+    finalAmount,
+    editableData.pix?.key,
+    editableData.pix?.payload,
+    editableData.pix?.qrCodeDataUrl,
+  ]);
+
   const captureReceiptImage = async (options?: { forceLight?: boolean }) => {
     if (!receiptRef.current) {
       throw new Error('receipt-preview-not-found');
@@ -214,6 +338,17 @@ export function ReceiptPreviewDialog({
     }
 
     return blob;
+  };
+
+  const saveReceiptImage = (blob: Blob, fileName: string) => {
+    const imageUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(imageUrl);
   };
 
   const handleDownloadPDF = async () => {
@@ -321,6 +456,7 @@ export function ReceiptPreviewDialog({
     }
 
     const fileName = `recibo-${editableData.ticket.id}.png`;
+    const shareText = shareMessage?.trim();
 
     setIsSharingReceipt(true);
     try {
@@ -328,6 +464,7 @@ export function ReceiptPreviewDialog({
       const file = new File([blob], fileName, { type: 'image/png' });
       const shareData: ShareData = {
         files: [file],
+        ...(shareText ? { text: shareText, title: 'Recibo' } : {}),
       };
 
       const navigatorAny = navigator as Navigator & {
@@ -356,14 +493,7 @@ export function ReceiptPreviewDialog({
         }
       }
 
-      const imageUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(imageUrl);
+      saveReceiptImage(blob, fileName);
 
       toast({
         title: 'Imagem salva',
@@ -378,6 +508,107 @@ export function ReceiptPreviewDialog({
       });
     } finally {
       setIsSharingReceipt(false);
+    }
+  };
+
+  const handleShareWhatsAppWeb = async () => {
+    if (
+      !requirePaid({
+        feature: 'Envio por WhatsApp',
+        description: 'Envios por WhatsApp estao disponiveis apenas na versao paga.',
+      })
+    ) {
+      return;
+    }
+
+    if (isSharingWhatsAppWeb) {
+      return;
+    }
+
+    const fileName = `recibo-${editableData.ticket.id}.png`;
+    const shareText = shareMessage?.trim();
+    const normalizedPhone = normalizePhone(
+      whatsappPhone || editableData.client.phone
+    );
+    const whatsappUrl = normalizedPhone
+      ? `https://wa.me/55${normalizedPhone}${
+          shareText ? `?text=${encodeURIComponent(shareText)}` : ''
+        }`
+      : shareText
+        ? `https://wa.me/?text=${encodeURIComponent(shareText)}`
+        : 'https://web.whatsapp.com/';
+
+    setIsSharingWhatsAppWeb(true);
+    try {
+      const blob = await captureReceiptImage();
+
+      if (navigator.clipboard && 'ClipboardItem' in window) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob }),
+          ]);
+          window.open(whatsappUrl, '_blank');
+          toast({
+            title: 'Imagem copiada',
+            description: 'Abra o WhatsApp Web e cole com Ctrl+V.',
+          });
+          return;
+        } catch (error) {
+          console.warn('Falha ao copiar imagem:', error);
+        }
+      }
+
+      saveReceiptImage(blob, fileName);
+      window.open(whatsappUrl, '_blank');
+      toast({
+        title: 'Imagem salva',
+        description: 'Arquivo do recibo gerado. No WhatsApp Web, anexe a imagem.',
+      });
+    } catch (error) {
+      console.error('Erro ao compartilhar no WhatsApp Web:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Nao foi possivel gerar a imagem do recibo.',
+      });
+    } finally {
+      setIsSharingWhatsAppWeb(false);
+    }
+  };
+
+  const handleDownloadImage = async () => {
+    if (
+      !requirePaid({
+        feature: 'Download de imagem do recibo',
+        description: 'Download de imagem esta disponivel apenas na versao paga.',
+      })
+    ) {
+      return;
+    }
+
+    if (isDownloadingImage) {
+      return;
+    }
+
+    const fileName = `recibo-${editableData.ticket.id}.png`;
+
+    setIsDownloadingImage(true);
+    try {
+      const blob = await captureReceiptImage();
+      saveReceiptImage(blob, fileName);
+      toast({
+        title: 'Imagem salva',
+        description: 'Recibo salvo no computador.',
+      });
+    } catch (error) {
+      console.error('Erro ao salvar recibo:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Nao foi possivel salvar a imagem do recibo.',
+      });
+    } finally {
+      setIsDownloadingImage(false);
     }
   };
 
@@ -436,11 +667,61 @@ export function ReceiptPreviewDialog({
     }));
   };
 
+  useEffect(() => {
+    if (!isOpen) {
+      autoShareTriggeredRef.current = false;
+      return;
+    }
+
+    if (!autoShare || autoShareTriggeredRef.current) {
+      return;
+    }
+
+    const pixKey = (integrationSettings?.pixKey || '').trim();
+    const shouldWaitForPix =
+      isIntegrationLoading ||
+      (pixKey && !editableData.pix?.qrCodeDataUrl);
+
+    if (shouldWaitForPix) {
+      return;
+    }
+
+    autoShareTriggeredRef.current = true;
+
+    const triggerShare = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (autoShare === 'whatsapp') {
+        const canNativeShare =
+          typeof navigator !== 'undefined' &&
+          typeof (navigator as Navigator).share === 'function';
+        if (canNativeShare) {
+          await handleShareReceipt();
+        } else {
+          await handleShareWhatsAppWeb();
+        }
+      } else if (autoShare === 'share') {
+        await handleShareReceipt();
+      }
+    };
+
+    triggerShare().catch((error) => {
+      console.warn('Erro ao compartilhar automaticamente:', error);
+    });
+  }, [
+    isOpen,
+    autoShare,
+    isIntegrationLoading,
+    integrationSettings?.pixKey,
+    editableData.pix?.qrCodeDataUrl,
+    shareMessage,
+    whatsappPhone,
+  ]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='max-w-3xl bg-white dark:bg-slate-900 border-none shadow-2xl overflow-hidden p-0'>
-        <DialogHeader className='p-6 bg-primary/5 border-b border-primary/10'>
-          <DialogTitle className='text-xl font-bold flex items-center gap-2'>
+      <DialogContent className='bg-white dark:bg-slate-900 border-none shadow-2xl overflow-hidden !p-0 !flex !flex-col !left-3 !right-3 !top-3 !bottom-[calc(4.5rem+env(safe-area-inset-bottom)+var(--keyboard-inset))] !translate-x-0 !translate-y-0 !w-auto !max-w-none sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!w-full sm:!max-w-3xl sm:!max-h-[90vh]'>
+        <DialogHeader className='p-4 sm:p-6 bg-primary/5 border-b border-primary/10'>
+          <DialogTitle className='text-lg sm:text-xl font-bold flex items-center gap-2'>
             <FileText className='w-5 h-5 text-primary' />
             Edição e Visualização do Recibo
           </DialogTitle>
@@ -449,7 +730,7 @@ export function ReceiptPreviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className='p-8 max-h-[70vh] overflow-y-auto space-y-6'>
+        <div className='flex-1 min-h-0 p-4 sm:p-8 overflow-y-auto overflow-x-hidden space-y-6'>
           <div className='grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 mb-4'>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Nome do Cliente</label>
@@ -463,7 +744,7 @@ export function ReceiptPreviewDialog({
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Valor (R$)</label>
               <Input 
                 type="number"
-                value={editableData.ticket.amount} 
+                value={amountValue}
                 onChange={(e) => {
                   const nextValue = Number(e.target.value);
                   updateTicketField(
@@ -477,15 +758,13 @@ export function ReceiptPreviewDialog({
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Desconto (R$)</label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={editableData.ticket.discount ?? 0}
+                type="text"
+                value={maskCurrency(numberToCurrencyString(discountValue))}
                 onChange={(e) => {
-                  const nextValue = Number(e.target.value);
+                  const masked = maskCurrency(e.target.value);
                   updateTicketField(
                     'discount',
-                    Number.isFinite(nextValue) ? nextValue : 0
+                    Math.max(0, parseFloat(unmaskCurrency(masked)) || 0)
                   );
                 }}
                 className="h-9 bg-white dark:bg-slate-900"
@@ -571,25 +850,27 @@ export function ReceiptPreviewDialog({
           {/* Receipt Content Preview */}
           <div
             ref={receiptRef}
-            className='border-2 border-slate-100 dark:border-slate-800 rounded-2xl p-8 space-y-8 bg-white dark:bg-slate-900 shadow-sm relative'
+            className='mx-auto w-full max-w-2xl border-2 border-slate-100 dark:border-slate-800 rounded-2xl p-4 sm:p-8 space-y-6 sm:space-y-8 bg-white dark:bg-slate-900 shadow-sm relative'
           >
-            <div className='flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-6'>
+            <div className='flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between'>
               {editableData.company.logoUrl ? (
-                <img src={editableData.company.logoUrl} alt='Logo' className='h-12 object-contain' />
+                <img src={editableData.company.logoUrl} alt='Logo' className='h-10 sm:h-12 object-contain' />
               ) : (
-                <div className='w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center'>
-                  <Building2 className='w-6 h-6 text-primary' />
+                <div className='w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center'>
+                  <Building2 className='w-5 h-5 sm:w-6 sm:h-6 text-primary' />
                 </div>
               )}
-              <div className='text-right'>
-                <h3 className='font-bold text-lg text-primary'>{editableData.company.name}</h3>
-                <p className='text-xs text-muted-foreground'>{editableData.company.cnpj || editableData.company.cpf}</p>
+              <div className='text-center sm:text-right'>
+                <h3 className='font-bold text-base sm:text-lg text-primary'>{editableData.company.name}</h3>
+                <p className='text-[11px] sm:text-xs text-muted-foreground'>
+                  {editableData.company.cnpj || editableData.company.cpf}
+                </p>
               </div>
             </div>
 
             <div className='text-center space-y-2'>
-              <h2 className='text-2xl font-black tracking-tight'>RECIBO</h2>
-              <p className='text-sm text-muted-foreground font-medium'>
+              <h2 className='text-xl sm:text-2xl font-black tracking-tight'>RECIBO</h2>
+              <p className='text-xs sm:text-sm text-muted-foreground font-medium'>
                 Nº {editableData.ticket.id.slice(0, 8).toUpperCase()}
               </p>
             </div>
@@ -612,17 +893,21 @@ export function ReceiptPreviewDialog({
                 .
               </p>
 
-              <div className='bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800'>
+              <div className='bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 sm:p-4 border border-slate-100 dark:border-slate-800'>
                 <p className='font-medium text-slate-500 mb-1 uppercase text-[10px] tracking-wider'>Referente a:</p>
                 {displayServiceItems.length > 0 ? (
                   <div className='space-y-2'>
                     {displayServiceItems.map((item, index) => (
                       <div
                         key={`${item.name}-${index}`}
-                        className='flex items-center justify-between text-sm font-medium text-slate-900 dark:text-white'
+                        className='flex flex-wrap items-start justify-between gap-2 text-xs sm:text-sm font-medium text-slate-900 dark:text-white'
                       >
-                        <span>{item.name || `Servico ${index + 1}`}</span>
-                        <span>{formatCurrency(item.amount)}</span>
+                        <span className='min-w-0 flex-1 break-words'>
+                          {item.name || `Servico ${index + 1}`}
+                        </span>
+                        <span className='shrink-0'>
+                          {formatCurrency(item.amount)}
+                        </span>
                       </div>
                     ))}
                     <div className='flex items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-2 text-sm font-bold text-slate-900 dark:text-white'>
@@ -641,19 +926,19 @@ export function ReceiptPreviewDialog({
               </div>
 
               {editableData.pix?.key && (
-                <div className='flex flex-col sm:flex-row items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4'>
+                <div className='flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 sm:p-4'>
                   {editableData.pix.qrCodeDataUrl ? (
                     <img
                       src={editableData.pix.qrCodeDataUrl}
                       alt='QR Code PIX'
-                      className='h-32 w-32 object-contain'
+                      className='h-24 w-24 sm:h-32 sm:w-32 object-contain'
                     />
                   ) : (
-                    <div className='h-32 w-32 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs text-slate-500'>
+                    <div className='h-24 w-24 sm:h-32 sm:w-32 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs text-slate-500'>
                       QR Code
                     </div>
                   )}
-                  <div className='w-full space-y-2 text-xs text-slate-700 dark:text-slate-200'>
+                  <div className='flex-1 min-w-0 space-y-2 text-[11px] sm:text-xs text-slate-700 dark:text-slate-200'>
                     <p className='text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400'>
                       Pagamento via PIX
                     </p>
@@ -678,9 +963,9 @@ export function ReceiptPreviewDialog({
               )}
 
               {editableData.ticket.warranty && (
-                <div className='flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/50'>
+                <div className='flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/30 p-2.5 sm:p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/50'>
                   <CheckCircle2 className='w-4 h-4' />
-                  <p className='text-xs'>GARANTIA: {editableData.ticket.warranty}</p>
+                  <p className='text-[11px] sm:text-xs'>GARANTIA: {editableData.ticket.warranty}</p>
                 </div>
               )}
 
@@ -689,57 +974,164 @@ export function ReceiptPreviewDialog({
               </p>
             </div>
 
-            <div className='pt-10 flex flex-col items-center gap-2'>
-              <div className='w-48 h-[1px] bg-slate-200 dark:bg-slate-700' />
+            <div className='pt-6 sm:pt-10 flex flex-col items-center gap-2'>
+              <div className='w-36 sm:w-48 h-[1px] bg-slate-200 dark:bg-slate-700' />
               <p className='text-xs font-bold uppercase tracking-widest'>{editableData.company.name}</p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className='p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex-row gap-2 sm:gap-0 justify-center sm:justify-end'>
-          <Button
-            variant='outline'
-            onClick={handlePrintReceipt}
-            disabled={isPrintingReceipt}
-            className='flex-1 sm:flex-none rounded-xl border-slate-200'
-          >
-            {isPrintingReceipt ? (
-              <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
-            ) : (
-              <Printer className='w-4 h-4 mr-2 text-slate-500' />
-            )}
-            Imprimir
-          </Button>
-          <Button variant='outline' onClick={handleDownloadPDF} className='flex-1 sm:flex-none rounded-xl border-slate-200'>
-            <Download className='w-4 h-4 mr-2 text-slate-500' />
-            PDF
-          </Button>
-          
-          <Button
-            variant='outline'
-            onClick={handleSendEmail}
-            disabled={isSendingEmail || !editableData.client.email}
-            className='flex-1 sm:flex-none rounded-xl border-slate-200'
-          >
-            {isSendingEmail ? (
-              <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
-            ) : (
-              <Mail className='w-4 h-4 mr-2 text-slate-500' />
-            )}
-            Email
-          </Button>
-          <Button
-            className='flex-1 sm:flex-none rounded-xl shadow-lg shadow-primary/20'
-            onClick={handleShareReceipt}
-            disabled={isSharingReceipt}
-          >
-            {isSharingReceipt ? (
-              <Loader2 className='w-4 h-4 mr-2 animate-spin' />
-            ) : (
-              <Share2 className='w-4 h-4 mr-2' />
-            )}
-            Compartilhar
-          </Button>
+        <DialogFooter className='p-4 sm:p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 gap-2 !flex-col sm:!flex-row sm:flex-wrap sm:justify-end'>
+          <div className='flex w-full items-center gap-2 sm:hidden'>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant='outline'
+                  className='flex-1 rounded-xl border-slate-200'
+                >
+                  <MoreHorizontal className='w-4 h-4 mr-2 text-slate-500' />
+                  Opcoes
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-52'>
+                <DropdownMenuItem
+                  onClick={handlePrintReceipt}
+                  disabled={isPrintingReceipt}
+                >
+                  {isPrintingReceipt ? (
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+                  ) : (
+                    <Printer className='w-4 h-4 mr-2 text-slate-500' />
+                  )}
+                  Imprimir
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPDF}>
+                  <Download className='w-4 h-4 mr-2 text-slate-500' />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleDownloadImage}
+                  disabled={isDownloadingImage}
+                >
+                  {isDownloadingImage ? (
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+                  ) : (
+                    <Image className='w-4 h-4 mr-2 text-slate-500' />
+                  )}
+                  Imagem
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !editableData.client.email}
+                >
+                  {isSendingEmail ? (
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+                  ) : (
+                    <Mail className='w-4 h-4 mr-2 text-slate-500' />
+                  )}
+                  Email
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleShareWhatsAppWeb}
+                  disabled={isSharingWhatsAppWeb}
+                >
+                  {isSharingWhatsAppWeb ? (
+                    <Loader2 className='w-4 h-4 mr-2 animate-spin text-emerald-600' />
+                  ) : (
+                    <MessageCircle className='w-4 h-4 mr-2 text-emerald-600' />
+                  )}
+                  WhatsApp Web
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              className='flex-1 rounded-xl shadow-lg shadow-primary/20'
+              onClick={handleShareReceipt}
+              disabled={isSharingReceipt}
+            >
+              {isSharingReceipt ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+              ) : (
+                <Share2 className='w-4 h-4 mr-2' />
+              )}
+              Compartilhar
+            </Button>
+          </div>
+
+          <div className='hidden w-full flex-wrap gap-2 sm:flex sm:justify-end'>
+            <Button
+              variant='outline'
+              onClick={handlePrintReceipt}
+              disabled={isPrintingReceipt}
+              className='rounded-xl border-slate-200'
+            >
+              {isPrintingReceipt ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+              ) : (
+                <Printer className='w-4 h-4 mr-2 text-slate-500' />
+              )}
+              Imprimir
+            </Button>
+            <Button
+              variant='outline'
+              onClick={handleDownloadPDF}
+              className='rounded-xl border-slate-200'
+            >
+              <Download className='w-4 h-4 mr-2 text-slate-500' />
+              PDF
+            </Button>
+            <Button
+              variant='outline'
+              onClick={handleDownloadImage}
+              disabled={isDownloadingImage}
+              className='rounded-xl border-slate-200'
+            >
+              {isDownloadingImage ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+              ) : (
+                <Image className='w-4 h-4 mr-2 text-slate-500' />
+              )}
+              Imagem
+            </Button>
+            <Button
+              variant='outline'
+              onClick={handleSendEmail}
+              disabled={isSendingEmail || !editableData.client.email}
+              className='rounded-xl border-slate-200'
+            >
+              {isSendingEmail ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin text-slate-500' />
+              ) : (
+                <Mail className='w-4 h-4 mr-2 text-slate-500' />
+              )}
+              Email
+            </Button>
+            <Button
+              variant='outline'
+              onClick={handleShareWhatsAppWeb}
+              disabled={isSharingWhatsAppWeb}
+              className='rounded-xl border-emerald-200 text-emerald-700 hover:text-emerald-800'
+            >
+              {isSharingWhatsAppWeb ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin text-emerald-600' />
+              ) : (
+                <MessageCircle className='w-4 h-4 mr-2 text-emerald-600' />
+              )}
+              WhatsApp Web
+            </Button>
+            <Button
+              className='rounded-xl shadow-lg shadow-primary/20'
+              onClick={handleShareReceipt}
+              disabled={isSharingReceipt}
+            >
+              {isSharingReceipt ? (
+                <Loader2 className='w-4 h-4 mr-2 animate-spin' />
+              ) : (
+                <Share2 className='w-4 h-4 mr-2' />
+              )}
+              Compartilhar
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

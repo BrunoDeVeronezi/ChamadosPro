@@ -48,6 +48,7 @@ export function useTenantRouting() {
       'confirm-email',
       'completar-cadastro',
       'landing',
+      'pagamento',
       'master-admin',
       'master-admin-login',
     ];

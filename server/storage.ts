@@ -20,6 +20,8 @@ import {
   type InsertFinancialRecord,
   type IntegrationSettings,
   type InsertIntegrationSettings,
+  type PaymentIntegration,
+  type InsertPaymentIntegration,
   type ReminderLog,
   type InsertReminderLog,
   type LocalEvent,
@@ -163,6 +165,15 @@ export interface IStorage {
   createOrUpdateIntegrationSettings(
     settings: InsertIntegrationSettings
   ): Promise<IntegrationSettings>;
+
+  // Payment Integrations (OAuth / PSP)
+  getPaymentIntegration(
+    userId: string,
+    provider: string
+  ): Promise<PaymentIntegration | undefined>;
+  upsertPaymentIntegration(
+    integration: InsertPaymentIntegration
+  ): Promise<PaymentIntegration>;
 
   // Reminder Logs
   getReminderLog(id: string): Promise<ReminderLog | undefined>;

@@ -475,7 +475,7 @@ export function AppSidebarMobileFooter() {
   if (!isMobile) return null;
 
   return (
-    <div className='fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 md:hidden shadow-[0_-4px_12px_rgba(0,0,0,0.05)]'>
+    <div className='fixed bottom-[var(--keyboard-inset)] left-0 right-0 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] z-40 md:hidden shadow-[0_-4px_12px_rgba(0,0,0,0.05)]'>
       {topMenuItems.map((item) => {
         const Icon = item.icon;
         const menuId = item.id || item.url;

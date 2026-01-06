@@ -5614,7 +5614,7 @@ export default function Chamados() {
                   ),
                   serviceItems: data.serviceItems,
                   date: data.paymentDate || new Date().toISOString(),
-                  amount: data.totalAmount,
+                  amount: data.totalAmount + data.discount,
                   discount: data.discount,
                   kmChargeExempt: data.kmChargeExempt,
                   description: data.expenseDetails,

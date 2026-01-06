@@ -133,6 +133,8 @@ import { TicketCompleteDialog } from '@/components/ticket-complete-dialog';
 
 import { ReceiptPreviewDialog } from '@/components/receipt-preview-dialog';
 
+import { MobileBackButton } from '@/components/mobile-back-button';
+
 import { buildServiceSummary } from '@/utils/service-items';
 
 import {
@@ -9868,11 +9870,11 @@ export default function Dashboard() {
 
       {loadingStats ? (
 
-        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+        <div className='grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4'>
 
           {[1, 2, 3, 4, 5, 6, 7].map((i) => (
 
-            <Skeleton key={i} className='h-[120px] rounded-2xl' />
+            <Skeleton key={i} className='h-[80px] sm:h-[120px] rounded-xl sm:rounded-2xl' />
 
           ))}
 
@@ -9884,7 +9886,7 @@ export default function Dashboard() {
 
           {/* Cards de Métricas Principais - Estilo "Bento Grid" Refinado */}
 
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4'>
+          <div className='grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4'>
 
             
 
@@ -9892,19 +9894,21 @@ export default function Dashboard() {
 
             <div 
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-emerald-50/80 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 shadow-md hover:shadow-xl transition-all duration-300'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-emerald-50/80 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 shadow-md hover:shadow-xl transition-all duration-300'
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <DollarSign className='h-5 w-5 text-emerald-600 dark:text-emerald-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+
+                  <DollarSign className='h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 stroke-[2.5px]' />
 
                 </div>
 
-                <Badge variant='outline' className='bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/30 text-[9px] font-black uppercase tracking-wider'>
+                <Badge variant='outline' className='bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/30 text-[8px] sm:text-[9px] font-black uppercase tracking-wider px-1 py-0 sm:px-2.5 sm:py-0.5'>
 
                   {periodLabel}
 
@@ -9914,23 +9918,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Total Recebido + KM
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {formatCurrency(totalRecebido + (kmMetrics.lucroKm || 0))}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-emerald-500 animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight line-clamp-1'>
 
                     Lucro com KM incluso
 
@@ -9940,7 +9944,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-emerald-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -9950,7 +9954,7 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-amber-50/80 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-amber-50/80 dark:bg-amber-500/5 border border-amber-200/60 dark:border-amber-500/20 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer'
 
               onClick={() => setLocation('/chamados?status=ABERTO')}
 
@@ -9960,17 +9964,19 @@ export default function Dashboard() {
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-amber-50/50 dark:ring-amber-500/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <Clock3 className='h-5 w-5 text-amber-600 dark:text-amber-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-amber-50/50 dark:ring-amber-500/5'>
+
+                  <Clock3 className='h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 stroke-[2.5px]' />
 
                 </div>
 
-                <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+                <div className='flex items-center gap-1 text-emerald-500 font-black text-[8px] sm:text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1 py-0 sm:px-1.5 sm:py-0.5 rounded-full'>
 
-                  <TrendingUp className='h-3 w-3 stroke-[3px]' />
+                  <TrendingUp className='h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[3px]' />
 
                   5.2%
 
@@ -9980,23 +9986,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Chamados Abertos
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {chamadosEmAberto}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-amber-500 animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight line-clamp-1'>
 
                     Aguardando atendimento
 
@@ -10006,7 +10012,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-amber-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -10016,21 +10022,23 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-blue-50/80 dark:bg-blue-500/5 border border-blue-200/60 dark:border-blue-500/20 shadow-md hover:shadow-xl transition-all duration-300'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-blue-50/80 dark:bg-blue-500/5 border border-blue-200/60 dark:border-blue-500/20 shadow-md hover:shadow-xl transition-all duration-300'
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-blue-50/50 dark:ring-blue-500/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <CheckCheck className='h-5 w-5 text-blue-600 dark:text-blue-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-blue-50 dark:bg-blue-500/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-blue-50/50 dark:ring-blue-500/5'>
+
+                  <CheckCheck className='h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 stroke-[2.5px]' />
 
                 </div>
 
-                <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+                <div className='flex items-center gap-1 text-emerald-500 font-black text-[8px] sm:text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1 py-0 sm:px-1.5 sm:py-0.5 rounded-full'>
 
-                  <TrendingUp className='h-3 w-3 stroke-[3px]' />
+                  <TrendingUp className='h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[3px]' />
 
                   12.1%
 
@@ -10040,23 +10048,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Concluídos (Mês)
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {completedThisMonth}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-blue-500 animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight line-clamp-1'>
 
                     Finalizados com sucesso
 
@@ -10066,7 +10074,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-blue-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -10076,19 +10084,21 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-white dark:bg-slate-900 border border-slate-300/50 dark:border-slate-800 shadow-md hover:shadow-xl hover:border-red-500/20 transition-all duration-300'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-white dark:bg-slate-900 border border-slate-300/50 dark:border-slate-800 shadow-md hover:shadow-xl hover:border-red-500/20 transition-all duration-300'
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-red-50 dark:bg-red-900/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-red-50/50 dark:ring-red-900/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <XCircle className='h-5 w-5 text-red-600 dark:text-red-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-red-50 dark:bg-red-900/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-red-50/50 dark:ring-red-900/5'>
+
+                  <XCircle className='h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 stroke-[2.5px]' />
 
                 </div>
 
-                <Badge variant='outline' className='bg-red-50/50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/30 text-[9px] font-black tracking-wider uppercase'>
+                <Badge variant='outline' className='bg-red-50/50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800/30 text-[8px] sm:text-[9px] font-black tracking-wider uppercase px-1 py-0 sm:px-2.5 sm:py-0.5'>
 
                   Crítico
 
@@ -10098,23 +10108,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Cancelados (Mês)
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {cancelledThisMonth}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-red-500' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-red-500' />
 
-                  <p className='text-[9px] font-bold text-red-600 dark:text-red-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-red-600 dark:text-red-400 uppercase tracking-tight line-clamp-1'>
 
                     {cancelledThisMonth > 0
 
@@ -10128,7 +10138,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-red-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -10138,21 +10148,23 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-emerald-50/80 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 shadow-md hover:shadow-xl transition-all duration-300'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-emerald-50/80 dark:bg-emerald-500/5 border border-emerald-200/60 dark:border-emerald-500/20 shadow-md hover:shadow-xl transition-all duration-300'
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <CheckCircle2 className='h-5 w-5 text-emerald-600 dark:text-emerald-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-emerald-50/50 dark:ring-emerald-500/5'>
+
+                  <CheckCircle2 className='h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 stroke-[2.5px]' />
 
                 </div>
 
-                <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+                <div className='flex items-center gap-1 text-emerald-500 font-black text-[8px] sm:text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1 py-0 sm:px-1.5 sm:py-0.5 rounded-full'>
 
-                  <TrendingUp className='h-3 w-3 stroke-[3px]' />
+                  <TrendingUp className='h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[3px]' />
 
                   8.5%
 
@@ -10162,23 +10174,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Recebido ({periodLabel})
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {formatCurrency(totalRecebido)}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-emerald-500 animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-tight line-clamp-1'>
 
                     Pagamentos confirmados
 
@@ -10188,7 +10200,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-emerald-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -10198,7 +10210,7 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-orange-50/80 dark:bg-orange-500/5 border border-orange-200/60 dark:border-orange-500/20 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-orange-50/80 dark:bg-orange-500/5 border border-orange-200/60 dark:border-orange-500/20 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer'
 
               onClick={() => setShowPendingPayments(true)}
 
@@ -10208,17 +10220,19 @@ export default function Dashboard() {
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-4 ring-orange-50/50 dark:ring-orange-500/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <Clock3 className='h-5 w-5 text-orange-600 dark:text-orange-400 stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-orange-50 dark:bg-orange-500/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:-rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-orange-50/50 dark:ring-orange-500/5'>
+
+                  <Clock3 className='h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400 stroke-[2.5px]' />
 
                 </div>
 
-                <div className='flex items-center gap-1 text-orange-500 font-black text-[10px] bg-orange-50/50 dark:bg-orange-500/5 px-1.5 py-0.5 rounded-full'>
+                <div className='flex items-center gap-1 text-orange-500 font-black text-[8px] sm:text-[10px] bg-orange-50/50 dark:bg-orange-500/5 px-1 py-0 sm:px-1.5 sm:py-0.5 rounded-full'>
 
-                  <TrendingUp className='h-3 w-3 stroke-[3px]' />
+                  <TrendingUp className='h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[3px]' />
 
                   2.1%
 
@@ -10228,23 +10242,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Pendente ({periodLabel})
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {formatCurrency(totalPendente)}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-orange-500 animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-tight line-clamp-1'>
 
                     {totalPendente > 0 ? 'Aguardando pagamento' : 'Tudo em dia'}
 
@@ -10254,7 +10268,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-orange-500/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -10264,21 +10278,23 @@ export default function Dashboard() {
 
             <div
 
-              className='group relative overflow-hidden flex flex-col justify-between rounded-2xl p-5 bg-indigo-50/80 dark:bg-primary/5 border border-indigo-200/60 dark:border-primary/20 shadow-md hover:shadow-xl transition-all duration-300'
+              className='group relative overflow-hidden flex flex-col justify-between rounded-xl sm:rounded-2xl p-3 sm:p-5 bg-indigo-50/80 dark:bg-primary/5 border border-indigo-200/60 dark:border-primary/20 shadow-md hover:shadow-xl transition-all duration-300'
 
             >
 
-              <div className='flex items-center justify-between mb-4'>
+              <MobileBackButton className='absolute left-2 top-2 z-10' stopPropagation />
 
-                <div className='p-2.5 bg-primary/5 dark:bg-primary/10 rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-4 ring-primary/5 dark:ring-primary/5'>
+              <div className='flex items-center justify-between mb-2 sm:mb-4 pl-8 sm:pl-0'>
 
-                  <TrendingUp className='h-5 w-5 text-primary stroke-[2.5px]' />
+                <div className='p-2 sm:p-2.5 bg-primary/5 dark:bg-primary/10 rounded-lg sm:rounded-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 ring-2 sm:ring-4 ring-primary/5 dark:ring-primary/5'>
+
+                  <TrendingUp className='h-4 w-4 sm:h-5 sm:w-5 text-primary stroke-[2.5px]' />
 
                 </div>
 
-                <div className='flex items-center gap-1 text-emerald-500 font-black text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1.5 py-0.5 rounded-full'>
+                <div className='flex items-center gap-1 text-emerald-500 font-black text-[8px] sm:text-[10px] bg-emerald-50/50 dark:bg-emerald-500/5 px-1 py-0 sm:px-1.5 sm:py-0.5 rounded-full'>
 
-                  <TrendingUp className='h-3 w-3 stroke-[3px]' />
+                  <TrendingUp className='h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[3px]' />
 
                   9.3%
 
@@ -10288,23 +10304,23 @@ export default function Dashboard() {
 
               <div>
 
-                <p className='text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1'>
+                <p className='text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-0 sm:mb-1 line-clamp-1'>
 
                   Faturamento ({periodLabel})
 
                 </p>
 
-                <p className='text-2xl font-black text-slate-900 dark:text-white leading-tight'>
+                <p className='text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-tight'>
 
                   {formatCurrency(faturamentoTotal)}
 
                 </p>
 
-                <div className='mt-2 flex items-center gap-1.5'>
+                <div className='mt-1 sm:mt-2 flex items-center gap-1.5'>
 
-                  <div className='h-1.5 w-1.5 rounded-full bg-primary animate-pulse' />
+                  <div className='h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-primary animate-pulse' />
 
-                  <p className='text-[9px] font-bold text-primary uppercase tracking-tight'>
+                  <p className='text-[8px] sm:text-[9px] font-bold text-primary uppercase tracking-tight line-clamp-1'>
 
                     Volume total negociado
 
@@ -10314,7 +10330,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className='absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700' />
+              <div className='absolute top-0 right-0 w-16 h-16 sm:w-24 sm:h-24 bg-primary/5 rounded-full -mr-8 -mt-8 sm:-mr-12 sm:-mt-12 group-hover:scale-150 transition-transform duration-700' />
 
             </div>
 
@@ -11572,7 +11588,7 @@ export default function Dashboard() {
 
                   date: data.paymentDate || new Date().toISOString(),
 
-                  amount: data.totalAmount,
+                  amount: data.totalAmount + data.discount,
 
                   discount: data.discount,
 

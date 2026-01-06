@@ -2,6 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -17,6 +31,8 @@ import { ReceiptPreviewDialog } from '@/components/receipt-preview-dialog';
 import { buildServiceSummary, coerceServiceItems } from '@/utils/service-items';
 import QRCode from 'qrcode';
 import { buildPixPayload } from '@shared/pix';
+import { fetchCepData } from '@/services/CepService';
+import { maskCNPJ, maskCPF, maskCEP, maskPhone } from '@/lib/masks';
 import {
   Table,
   TableBody,
@@ -47,6 +63,33 @@ interface IntegrationSettings {
   pixKeyType?: string | null;
   pixAccountHolder?: string | null;
 }
+
+interface MercadoPagoStatus {
+  configured: boolean;
+  connected: boolean;
+  status: string;
+  providerUserId?: string | null;
+  publicKey?: string | null;
+  scope?: string | null;
+  tokenExpiresAt?: string | null;
+}
+
+type KycFormState = {
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  document: string;
+  documentType: 'cpf' | 'cnpj' | null;
+  birthDate: string;
+  phone: string;
+  zipCode: string;
+  streetAddress: string;
+  addressNumber: string;
+  addressComplement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+};
 
 const parseDateInput = (
   value: string | null | undefined,
@@ -90,6 +133,11 @@ function PaymentActionButtons({
   const { user } = useAuth();
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [receiptAutoShare, setReceiptAutoShare] = useState<
+    'whatsapp' | null
+  >(null);
+  const [receiptShareMessage, setReceiptShareMessage] = useState('');
+  const [receiptWhatsAppPhone, setReceiptWhatsAppPhone] = useState('');
   const containerClassName =
     layout === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap gap-2';
   const buttonLayoutClassName =
@@ -114,7 +162,7 @@ function PaymentActionButtons({
 
   const hasPixKey = Boolean(pixKey && pixKey.trim());
 
-  const handleEmitReceipt = async () => {
+  const handleEmitReceipt = async (autoShare?: 'whatsapp') => {
     try {
       let ticketDetails = null;
       let clientDetails = null;
@@ -142,6 +190,12 @@ function PaymentActionButtons({
         serviceItems,
         ticketDetails?.service?.name || description || 'Servico Prestado'
       );
+      const ticketRef =
+        ticketDetails?.ticketNumber ||
+        ticketId ||
+        financialRecordId ||
+        'sem-id';
+      const shareMessage = `Segue o recibo do chamado ${ticketRef}.`;
 
       let pixData:
         | {
@@ -154,8 +208,6 @@ function PaymentActionButtons({
 
       if (pixKey && pixKey.trim()) {
         try {
-          const ticketRef =
-            ticketDetails?.ticketNumber || ticketId || financialRecordId || '';
           const normalizedRef = String(ticketRef)
             .replace('#', '')
             .replace(/\s/g, '');
@@ -185,6 +237,11 @@ function PaymentActionButtons({
         }
       }
 
+      setReceiptShareMessage(shareMessage);
+      setReceiptWhatsAppPhone(
+        ticketDetails?.clientPhone || clientDetails?.phone || ''
+      );
+      setReceiptAutoShare(autoShare || null);
       setReceiptData({
         company: {
           name: user?.companyName || 'Sua Empresa',
@@ -358,6 +415,41 @@ function PaymentActionButtons({
     },
   });
 
+  const ensureWhatsAppAccess = () => {
+    if (
+      !requirePaid({
+        feature: 'Envio por WhatsApp',
+        description:
+          'Envios por WhatsApp estao disponiveis apenas na versao paga.',
+      })
+    ) {
+      return false;
+    }
+    if (!hasPixKey) {
+      toast({
+        variant: 'destructive',
+        title: 'Chave PIX nao configurada',
+        description: 'Cadastre a chave PIX acima antes de enviar.',
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleWhatsAppText = () => {
+    if (!ensureWhatsAppAccess()) {
+      return;
+    }
+    sendWhatsAppMutation.mutate();
+  };
+
+  const handleWhatsAppImage = () => {
+    if (!ensureWhatsAppAccess()) {
+      return;
+    }
+    handleEmitReceipt('whatsapp');
+  };
+
   return (
     <div className={containerClassName}>
       <Button
@@ -385,39 +477,31 @@ function PaymentActionButtons({
         Recibo
       </Button>
 
-      <Button
-        size='sm'
-        variant='outline'
-        onClick={() => {
-          if (
-            !requirePaid({
-              feature: 'Envio por WhatsApp',
-              description:
-                'Envios por WhatsApp estao disponiveis apenas na versao paga.',
-            })
-          ) {
-            return;
-          }
-          if (!hasPixKey) {
-            toast({
-              variant: 'destructive',
-              title: 'Chave PIX nao configurada',
-              description: 'Cadastre a chave PIX acima antes de enviar.',
-            });
-            return;
-          }
-          sendWhatsAppMutation.mutate();
-        }}
-        disabled={sendWhatsAppMutation.isPending}
-        className={`flex items-center gap-2${buttonLayoutClassName ? ` ${buttonLayoutClassName}` : ''}`}
-      >
-        {sendWhatsAppMutation.isPending ? (
-          <Loader2 className='h-4 w-4 animate-spin' />
-        ) : (
-          <MessageCircle className='h-4 w-4' />
-        )}
-        WhatsApp
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size='sm'
+            variant='outline'
+            disabled={sendWhatsAppMutation.isPending}
+            className={`flex items-center gap-2${buttonLayoutClassName ? ` ${buttonLayoutClassName}` : ''}`}
+          >
+            {sendWhatsAppMutation.isPending ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : (
+              <MessageCircle className='h-4 w-4' />
+            )}
+            WhatsApp
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='end'>
+          <DropdownMenuItem onClick={handleWhatsAppText}>
+            Texto (link)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleWhatsAppImage}>
+            Imagem (recibo)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         size='sm'
         variant='outline'
@@ -449,11 +533,17 @@ function PaymentActionButtons({
           onClose={() => {
             setIsReceiptModalOpen(false);
             setReceiptData(null);
+            setReceiptAutoShare(null);
+            setReceiptShareMessage('');
+            setReceiptWhatsAppPhone('');
           }}
           data={receiptData}
+          autoShare={receiptAutoShare}
+          shareMessage={receiptShareMessage}
+          whatsappPhone={receiptWhatsAppPhone}
         />
       )}
-    </div>
+      </div>
   );
 }
 
@@ -474,16 +564,391 @@ export default function DashboardFinanceiro() {
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const [isKycDialogOpen, setIsKycDialogOpen] = useState(false);
+  const [pendingMpConnect, setPendingMpConnect] = useState(false);
+  const [isConnectingMp, setIsConnectingMp] = useState(false);
+  const [isSubmittingKyc, setIsSubmittingKyc] = useState(false);
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
+  const [kycErrors, setKycErrors] = useState<Record<string, string>>({});
+  const [kycForm, setKycForm] = useState<KycFormState>({
+    firstName: '',
+    lastName: '',
+    companyName: '',
+    document: '',
+    documentType: null,
+    birthDate: '',
+    phone: '',
+    zipCode: '',
+    streetAddress: '',
+    addressNumber: '',
+    addressComplement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
+  });
 
   const { data: integrationSettings } = useQuery<IntegrationSettings>({
     queryKey: ['/api/integration-settings'],
   });
+
+  const { data: mercadoPagoStatus, isLoading: isLoadingMpStatus } =
+    useQuery<MercadoPagoStatus>({
+      queryKey: ['/api/mercadopago/status'],
+    });
 
   const [pixKeyInput, setPixKeyInput] = useState('');
 
   useEffect(() => {
     setPixKeyInput(integrationSettings?.pixKey || '');
   }, [integrationSettings?.pixKey]);
+
+  useEffect(() => {
+    if (!isKycDialogOpen || !user) return;
+
+    const rawDocument = String(user.cnpj || user.cpf || '');
+    const documentDigits = rawDocument.replace(/\D/g, '');
+    let documentType: 'cpf' | 'cnpj' | null = null;
+    let documentMasked = '';
+
+    if (documentDigits.length === 11) {
+      documentType = 'cpf';
+      documentMasked = maskCPF(documentDigits);
+    } else if (documentDigits.length === 14) {
+      documentType = 'cnpj';
+      documentMasked = maskCNPJ(documentDigits);
+    }
+
+    const phoneValue = user.phone ? String(user.phone) : '';
+    const normalizedPhone =
+      phoneValue && (phoneValue.includes('(') || phoneValue.includes('-'))
+        ? phoneValue
+        : maskPhone(phoneValue);
+
+    const zipValue = user.zipCode ? String(user.zipCode) : '';
+    const normalizedZip = zipValue ? maskCEP(zipValue) : '';
+
+    let birthDate = '';
+    if (user.birthDate) {
+      const parsedDate = new Date(user.birthDate);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        birthDate = format(parsedDate, 'yyyy-MM-dd');
+      }
+    }
+
+    setKycErrors({});
+    setKycForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      companyName: user.companyName || '',
+      document: documentMasked,
+      documentType,
+      birthDate,
+      phone: normalizedPhone,
+      zipCode: normalizedZip,
+      streetAddress: user.streetAddress || '',
+      addressNumber: user.addressNumber || '',
+      addressComplement: user.addressComplement || '',
+      neighborhood: user.neighborhood || '',
+      city: user.city || '',
+      state: user.state || '',
+    });
+  }, [isKycDialogOpen, user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mpStatus = params.get('mp');
+
+    if (!mpStatus) return;
+
+    if (mpStatus === 'connected') {
+      toast({
+        title: 'Mercado Pago conectado',
+        description: 'Recebimentos automaticos habilitados.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/mercadopago/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    }
+
+    if (mpStatus === 'error') {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao conectar Mercado Pago',
+        description: 'Tente novamente.',
+      });
+    }
+
+    params.delete('mp');
+    const nextSearch = params.toString();
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`
+    );
+  }, [toast, queryClient]);
+
+  const missingKycLabels = useMemo(() => {
+    if (!user) return [];
+    const missing: string[] = [];
+    const docDigits = String(user.cpf || user.cnpj || '')
+      .replace(/\D/g, '')
+      .trim();
+    const docKind = user.cpf
+      ? 'cpf'
+      : user.cnpj
+        ? 'cnpj'
+        : null;
+    const phoneDigits = String(user.phone || '').replace(/\D/g, '');
+    const zipDigits = String(user.zipCode || '').replace(/\D/g, '');
+
+    if (!user.firstName) missing.push('Nome');
+    if (!user.lastName) missing.push('Sobrenome');
+    if (!user.companyName) missing.push('Empresa');
+    if (!docDigits) missing.push('CPF/CNPJ');
+    if (docKind === 'cpf' && !user.birthDate) missing.push('Nascimento');
+    if (!phoneDigits || phoneDigits.length < 10) missing.push('Telefone');
+    if (!zipDigits || zipDigits.length < 8) missing.push('CEP');
+    if (!user.streetAddress) missing.push('Endereco');
+    if (!user.addressNumber) missing.push('Numero');
+    if (!user.neighborhood) missing.push('Bairro');
+    if (!user.city) missing.push('Cidade');
+    if (!user.state) missing.push('UF');
+
+    return missing;
+  }, [user]);
+
+  const isDocumentLocked = Boolean(user?.cpf || user?.cnpj);
+
+  const updateKycField = (field: keyof KycFormState, value: string) => {
+    setKycForm((prev) => ({ ...prev, [field]: value }));
+    setKycErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const handleKycDocumentChange = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 11) {
+      setKycForm((prev) => ({
+        ...prev,
+        document: maskCPF(digits),
+        documentType: 'cpf',
+      }));
+    } else {
+      setKycForm((prev) => ({
+        ...prev,
+        document: maskCNPJ(digits),
+        documentType: 'cnpj',
+      }));
+    }
+    setKycErrors((prev) => {
+      if (!prev.document) return prev;
+      const next = { ...prev };
+      delete next.document;
+      return next;
+    });
+  };
+
+  const handleKycPhoneChange = (value: string) => {
+    updateKycField('phone', maskPhone(value));
+  };
+
+  const handleKycZipChange = (value: string) => {
+    updateKycField('zipCode', maskCEP(value));
+  };
+
+  const handleKycZipBlur = async () => {
+    const cleanCep = kycForm.zipCode.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    setIsFetchingCep(true);
+    try {
+      const cepData = await fetchCepData(cleanCep);
+      if (cepData) {
+        setKycForm((prev) => ({
+          ...prev,
+          zipCode: maskCEP(cepData.cep || cleanCep),
+          streetAddress: cepData.street || prev.streetAddress,
+          neighborhood: cepData.neighborhood || prev.neighborhood,
+          city: cepData.city || prev.city,
+          state: cepData.state || prev.state,
+          addressComplement:
+            cepData.complement || prev.addressComplement,
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+    } finally {
+      setIsFetchingCep(false);
+    }
+  };
+
+  const validateKycForm = () => {
+    const nextErrors: Record<string, string> = {};
+    const docDigits = kycForm.document.replace(/\D/g, '');
+    const phoneDigits = kycForm.phone.replace(/\D/g, '');
+    const zipDigits = kycForm.zipCode.replace(/\D/g, '');
+
+    if (!kycForm.firstName.trim()) nextErrors.firstName = 'Informe o nome.';
+    if (!kycForm.lastName.trim()) nextErrors.lastName = 'Informe o sobrenome.';
+    if (!kycForm.companyName.trim())
+      nextErrors.companyName = 'Informe a empresa.';
+
+    if (!docDigits) {
+      nextErrors.document = 'Informe CPF ou CNPJ.';
+    } else if (docDigits.length !== 11 && docDigits.length !== 14) {
+      nextErrors.document = 'Documento invalido.';
+    }
+
+    if (!phoneDigits || phoneDigits.length < 10) {
+      nextErrors.phone = 'Telefone com DDD obrigatorio.';
+    }
+
+    if (kycForm.documentType === 'cpf' && !kycForm.birthDate) {
+      nextErrors.birthDate = 'Informe a data de nascimento.';
+    }
+
+    if (!zipDigits || zipDigits.length < 8) {
+      nextErrors.zipCode = 'Informe o CEP.';
+    }
+    if (!kycForm.streetAddress.trim()) {
+      nextErrors.streetAddress = 'Informe o endereco.';
+    }
+    if (!kycForm.addressNumber.trim()) {
+      nextErrors.addressNumber = 'Informe o numero.';
+    }
+    if (!kycForm.neighborhood.trim()) {
+      nextErrors.neighborhood = 'Informe o bairro.';
+    }
+    if (!kycForm.city.trim()) {
+      nextErrors.city = 'Informe a cidade.';
+    }
+    if (!kycForm.state.trim() || kycForm.state.trim().length < 2) {
+      nextErrors.state = 'Informe a UF.';
+    }
+
+    return nextErrors;
+  };
+
+  const startMercadoPagoOAuth = async () => {
+    setIsConnectingMp(true);
+    try {
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      const response = await apiRequest(
+        'GET',
+        `/api/mercadopago/oauth/start?returnTo=${encodeURIComponent(returnTo)}`,
+        undefined
+      );
+      const data = await response.json();
+
+      if (!data?.url) {
+        throw new Error('URL de autorizacao nao recebida.');
+      }
+
+      window.location.href = data.url;
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao iniciar Mercado Pago',
+        description: error?.message || 'Nao foi possivel iniciar a conexao.',
+      });
+      setIsConnectingMp(false);
+    }
+  };
+
+  const handleConnectMercadoPago = async () => {
+    if (isConnectingMp) return;
+    if (!mercadoPagoStatus?.configured) {
+      toast({
+        variant: 'destructive',
+        title: 'Mercado Pago nao configurado',
+        description: 'Configure as credenciais antes de conectar.',
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Usuario nao identificado',
+        description: 'Recarregue a pagina e tente novamente.',
+      });
+      return;
+    }
+
+    if (missingKycLabels.length > 0) {
+      setPendingMpConnect(true);
+      setIsKycDialogOpen(true);
+      return;
+    }
+
+    await startMercadoPagoOAuth();
+  };
+
+  const handleKycSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextErrors = validateKycForm();
+    setKycErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Dados incompletos',
+        description: 'Preencha os campos obrigatorios para continuar.',
+      });
+      return;
+    }
+
+    setIsSubmittingKyc(true);
+    try {
+      const cleanDocument = kycForm.document.replace(/\D/g, '');
+      const cleanPhone = kycForm.phone.replace(/\D/g, '');
+      const cleanZip = kycForm.zipCode.replace(/\D/g, '');
+
+      await apiRequest('POST', '/api/profile/complete', {
+        kycRequired: true,
+        firstName: kycForm.firstName.trim(),
+        lastName: kycForm.lastName.trim(),
+        companyName: kycForm.companyName.trim(),
+        phone: cleanPhone,
+        cpf: kycForm.documentType === 'cpf' ? cleanDocument : undefined,
+        cnpj: kycForm.documentType === 'cnpj' ? cleanDocument : undefined,
+        birthDate:
+          kycForm.documentType === 'cpf' ? kycForm.birthDate : undefined,
+        zipCode: cleanZip,
+        streetAddress: kycForm.streetAddress.trim(),
+        addressNumber: kycForm.addressNumber.trim(),
+        addressComplement: kycForm.addressComplement.trim(),
+        neighborhood: kycForm.neighborhood.trim(),
+        city: kycForm.city.trim(),
+        state: kycForm.state.trim().toUpperCase(),
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      toast({
+        title: 'Dados atualizados',
+        description: 'Agora voce pode conectar o Mercado Pago.',
+      });
+      setIsKycDialogOpen(false);
+
+      if (pendingMpConnect) {
+        setPendingMpConnect(false);
+        await startMercadoPagoOAuth();
+      }
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar dados',
+        description: error?.message || 'Nao foi possivel salvar.',
+      });
+    } finally {
+      setIsSubmittingKyc(false);
+    }
+  };
 
   const updatePixMutation = useMutation({
     mutationFn: async () => {
@@ -525,6 +990,15 @@ export default function DashboardFinanceiro() {
   const savedPixKey = (integrationSettings?.pixKey || '').trim();
   const pixAccountHolder = integrationSettings?.pixAccountHolder || null;
   const isPixDirty = pixKeyInput.trim() !== savedPixKey;
+  const mpStatusLabel = isLoadingMpStatus
+    ? 'Verificando'
+    : mercadoPagoStatus?.connected
+      ? 'Conectado'
+      : 'Desconectado';
+  const mpStatusBadgeClass = mercadoPagoStatus?.connected
+    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
+    : 'bg-slate-100 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300';
+  const canConnectMp = mercadoPagoStatus?.configured !== false;
 
   // Calcular datas baseado no período
   const dateRange = useMemo(() => {
@@ -651,7 +1125,353 @@ export default function DashboardFinanceiro() {
   };
 
   return (
-    <div className='max-w-7xl mx-auto'>
+    <>
+      <Dialog
+        open={isKycDialogOpen}
+        onOpenChange={(open) => {
+          setIsKycDialogOpen(open);
+          if (!open) {
+            setPendingMpConnect(false);
+          }
+        }}
+      >
+        <DialogContent className='max-w-3xl max-h-[90vh] min-h-0 overflow-hidden !flex !flex-col'>
+          <DialogHeader>
+            <DialogTitle>Complete seus dados</DialogTitle>
+            <DialogDescription>
+              Preencha os campos obrigatorios para conectar o Mercado Pago.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleKycSubmit} className='flex min-h-0 flex-col gap-4'>
+            <div className='flex-1 space-y-4 overflow-y-auto pr-2'>
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-first-name' className='text-sm font-medium'>
+                    Nome *
+                  </Label>
+                  <Input
+                    id='kyc-first-name'
+                    value={kycForm.firstName}
+                    onChange={(event) =>
+                      updateKycField('firstName', event.target.value)
+                    }
+                    className={
+                      kycErrors.firstName
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.firstName && (
+                    <p className='text-xs text-red-500'>{kycErrors.firstName}</p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-last-name' className='text-sm font-medium'>
+                    Sobrenome *
+                  </Label>
+                  <Input
+                    id='kyc-last-name'
+                    value={kycForm.lastName}
+                    onChange={(event) =>
+                      updateKycField('lastName', event.target.value)
+                    }
+                    className={
+                      kycErrors.lastName
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.lastName && (
+                    <p className='text-xs text-red-500'>{kycErrors.lastName}</p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-company' className='text-sm font-medium'>
+                    Empresa *
+                  </Label>
+                  <Input
+                    id='kyc-company'
+                    value={kycForm.companyName}
+                    onChange={(event) =>
+                      updateKycField('companyName', event.target.value)
+                    }
+                    className={
+                      kycErrors.companyName
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.companyName && (
+                    <p className='text-xs text-red-500'>
+                      {kycErrors.companyName}
+                    </p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-email' className='text-sm font-medium'>
+                    Email
+                  </Label>
+                  <Input id='kyc-email' value={user?.email || ''} disabled />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-document' className='text-sm font-medium'>
+                    CPF ou CNPJ *
+                  </Label>
+                  <Input
+                    id='kyc-document'
+                    value={kycForm.document}
+                    onChange={(event) =>
+                      handleKycDocumentChange(event.target.value)
+                    }
+                    placeholder={
+                      kycForm.documentType === 'cnpj'
+                        ? '00.000.000/0000-00'
+                        : '000.000.000-00'
+                    }
+                    disabled={isDocumentLocked}
+                    className={
+                      kycErrors.document
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {isDocumentLocked && (
+                    <p className='text-xs text-muted-foreground'>
+                      Documento ja cadastrado.
+                    </p>
+                  )}
+                  {kycErrors.document && (
+                    <p className='text-xs text-red-500'>{kycErrors.document}</p>
+                  )}
+                </div>
+                {kycForm.documentType === 'cpf' && (
+                  <div className='space-y-2'>
+                    <Label htmlFor='kyc-birth' className='text-sm font-medium'>
+                      Data de nascimento *
+                    </Label>
+                    <Input
+                      id='kyc-birth'
+                      type='date'
+                      value={kycForm.birthDate}
+                      onChange={(event) =>
+                        updateKycField('birthDate', event.target.value)
+                      }
+                      className={
+                        kycErrors.birthDate
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : ''
+                      }
+                      required
+                    />
+                    {kycErrors.birthDate && (
+                      <p className='text-xs text-red-500'>
+                        {kycErrors.birthDate}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-phone' className='text-sm font-medium'>
+                    Telefone *
+                  </Label>
+                  <Input
+                    id='kyc-phone'
+                    value={kycForm.phone}
+                    onChange={(event) =>
+                      handleKycPhoneChange(event.target.value)
+                    }
+                    placeholder='(00) 00000-0000'
+                    className={
+                      kycErrors.phone
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.phone && (
+                    <p className='text-xs text-red-500'>{kycErrors.phone}</p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-cep' className='text-sm font-medium'>
+                    CEP *
+                  </Label>
+                  <Input
+                    id='kyc-cep'
+                    value={kycForm.zipCode}
+                    onChange={(event) => handleKycZipChange(event.target.value)}
+                    onBlur={handleKycZipBlur}
+                    placeholder='00000-000'
+                    className={
+                      kycErrors.zipCode
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {isFetchingCep && (
+                    <p className='text-xs text-muted-foreground'>
+                      Buscando CEP...
+                    </p>
+                  )}
+                  {kycErrors.zipCode && (
+                    <p className='text-xs text-red-500'>{kycErrors.zipCode}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='space-y-2 md:col-span-2'>
+                  <Label htmlFor='kyc-street' className='text-sm font-medium'>
+                    Endereco *
+                  </Label>
+                  <Input
+                    id='kyc-street'
+                    value={kycForm.streetAddress}
+                    onChange={(event) =>
+                      updateKycField('streetAddress', event.target.value)
+                    }
+                    className={
+                      kycErrors.streetAddress
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.streetAddress && (
+                    <p className='text-xs text-red-500'>
+                      {kycErrors.streetAddress}
+                    </p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-number' className='text-sm font-medium'>
+                    Numero *
+                  </Label>
+                  <Input
+                    id='kyc-number'
+                    value={kycForm.addressNumber}
+                    onChange={(event) =>
+                      updateKycField('addressNumber', event.target.value)
+                    }
+                    className={
+                      kycErrors.addressNumber
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.addressNumber && (
+                    <p className='text-xs text-red-500'>
+                      {kycErrors.addressNumber}
+                    </p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-complement' className='text-sm font-medium'>
+                    Complemento
+                  </Label>
+                  <Input
+                    id='kyc-complement'
+                    value={kycForm.addressComplement}
+                    onChange={(event) =>
+                      updateKycField('addressComplement', event.target.value)
+                    }
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-neighborhood' className='text-sm font-medium'>
+                    Bairro *
+                  </Label>
+                  <Input
+                    id='kyc-neighborhood'
+                    value={kycForm.neighborhood}
+                    onChange={(event) =>
+                      updateKycField('neighborhood', event.target.value)
+                    }
+                    className={
+                      kycErrors.neighborhood
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.neighborhood && (
+                    <p className='text-xs text-red-500'>
+                      {kycErrors.neighborhood}
+                    </p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-city' className='text-sm font-medium'>
+                    Cidade *
+                  </Label>
+                  <Input
+                    id='kyc-city'
+                    value={kycForm.city}
+                    onChange={(event) =>
+                      updateKycField('city', event.target.value)
+                    }
+                    className={
+                      kycErrors.city
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.city && (
+                    <p className='text-xs text-red-500'>{kycErrors.city}</p>
+                  )}
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='kyc-state' className='text-sm font-medium'>
+                    UF *
+                  </Label>
+                  <Input
+                    id='kyc-state'
+                    value={kycForm.state}
+                    onChange={(event) =>
+                      updateKycField('state', event.target.value.toUpperCase())
+                    }
+                    className={
+                      kycErrors.state
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : ''
+                    }
+                    required
+                  />
+                  {kycErrors.state && (
+                    <p className='text-xs text-red-500'>{kycErrors.state}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className='pt-2'>
+              <Button
+                type='button'
+                variant='outline'
+                onClick={() => setIsKycDialogOpen(false)}
+                disabled={isSubmittingKyc}
+              >
+                Cancelar
+              </Button>
+              <Button type='submit' disabled={isSubmittingKyc}>
+                {isSubmittingKyc ? (
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                ) : (
+                  'Salvar e conectar'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <div className='max-w-7xl mx-auto pb-20 sm:pb-0'>
       <PageHeader>
         <div className='max-w-7xl mx-auto w-full'>
           <div className='flex flex-wrap justify-between items-center gap-4 mb-0'>
@@ -766,6 +1586,70 @@ export default function DashboardFinanceiro() {
           </div>
         </div>
       )}
+
+      <Card className='p-4 mb-6'>
+        <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+          <div className='flex items-start gap-3'>
+            <div className='flex h-11 w-11 items-center justify-center rounded-xl border bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60'>
+              <img
+                src='/mercado-pago-mark.svg'
+                alt='Mercado Pago'
+                className='h-7 w-7'
+              />
+            </div>
+            <div className='space-y-1'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <p className='text-base font-semibold'>Mercado Pago</p>
+                <Badge className={mpStatusBadgeClass}>{mpStatusLabel}</Badge>
+              </div>
+              <p className='text-sm text-muted-foreground'>
+                Conecte sua conta para receber pagamentos e enviar cobrancas
+                pelo Mercado Pago.
+              </p>
+              {mercadoPagoStatus?.providerUserId && (
+                <p className='text-xs text-muted-foreground'>
+                  Conta vinculada: {mercadoPagoStatus.providerUserId}
+                </p>
+              )}
+            </div>
+          </div>
+          <Button
+            onClick={handleConnectMercadoPago}
+            disabled={isConnectingMp || isLoadingMpStatus || !canConnectMp}
+            className='md:self-end'
+          >
+            {isConnectingMp ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : mercadoPagoStatus?.connected ? (
+              'Reconectar'
+            ) : (
+              'Conectar'
+            )}
+          </Button>
+        </div>
+        {!isLoadingMpStatus && !canConnectMp && (
+          <div className='mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100'>
+            Credenciais do Mercado Pago nao configuradas no servidor.
+          </div>
+        )}
+        {canConnectMp &&
+          !mercadoPagoStatus?.connected &&
+          missingKycLabels.length > 0 && (
+            <div className='mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <span className='font-medium'>Campos pendentes:</span>
+                {missingKycLabels.map((label) => (
+                  <span
+                    key={label}
+                    className='rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100'
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+      </Card>
 
       <Card className='p-4 mb-6'>
         <div className='flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
@@ -932,6 +1816,7 @@ export default function DashboardFinanceiro() {
         </Card>
       )}
     </div>
+    </>
   );
 }
 

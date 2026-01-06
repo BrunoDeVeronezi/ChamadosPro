@@ -46,12 +46,13 @@ export const generateReceiptPDF = async (data: ReceiptData) => {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  const finalAmountRaw = Number(data.ticket.amount);
-  const finalAmount = Number.isFinite(finalAmountRaw) ? finalAmountRaw : 0;
+  const baseAmountRaw = Number(data.ticket.amount);
+  const baseAmount = Number.isFinite(baseAmountRaw) ? baseAmountRaw : 0;
   const discountRaw = Number(data.ticket.discount ?? 0);
   const discountAmount =
     Number.isFinite(discountRaw) && discountRaw > 0 ? discountRaw : 0;
-  const originalAmount = finalAmount + discountAmount;
+  const originalAmount = baseAmount;
+  const finalAmount = Math.max(0, baseAmount - discountAmount);
 
   // Header background
   doc.setFillColor(245, 247, 248);

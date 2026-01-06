@@ -411,6 +411,40 @@ export const integrationSettings = pgTable('integration_settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Payment Integrations (OAuth / PSP connections per tenant)
+export const paymentIntegrations = pgTable(
+  'payment_integrations',
+  {
+    id: varchar('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: varchar('user_id')
+      .references(() => users.id)
+      .notNull(),
+    provider: text('provider').notNull(), // 'mercadopago', 'stripe', etc.
+    status: text('status').notNull().default('pending'), // pending, active, error, disconnected
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    tokenExpiresAt: timestamp('token_expires_at'),
+    scope: text('scope'),
+    providerUserId: text('provider_user_id'),
+    publicKey: text('public_key'),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_payment_integrations_user_provider').on(
+      table.userId,
+      table.provider
+    ),
+    index('idx_payment_integrations_provider_user').on(
+      table.providerUserId
+    ),
+    index('idx_payment_integrations_status').on(table.status),
+  ]
+);
+
 // Reminder Logs
 export const reminderLogs = pgTable('reminder_logs', {
   id: varchar('id')
@@ -942,6 +976,14 @@ export const insertIntegrationSettingsSchema = createInsertSchema(
   updatedAt: true,
 });
 
+export const insertPaymentIntegrationSchema = createInsertSchema(
+  paymentIntegrations
+).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertReminderLogSchema = createInsertSchema(reminderLogs).omit({
   id: true,
   sentAt: true,
@@ -1067,6 +1109,11 @@ export type InsertIntegrationSettings = z.infer<
   typeof insertIntegrationSettingsSchema
 >;
 export type IntegrationSettings = typeof integrationSettings.$inferSelect;
+
+export type InsertPaymentIntegration = z.infer<
+  typeof insertPaymentIntegrationSchema
+>;
+export type PaymentIntegration = typeof paymentIntegrations.$inferSelect;
 
 export type InsertReminderLog = z.infer<typeof insertReminderLogSchema>;
 export type ReminderLog = typeof reminderLogs.$inferSelect;

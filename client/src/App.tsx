@@ -59,6 +59,7 @@ import NotFound from '@/pages/not-found';
 import CompletarCadastro from '@/pages/completar-cadastro';
 import DadosTenant from '@/pages/dados-tenant';
 import Ajuda from '@/pages/ajuda';
+import PagamentoPublico from '@/pages/pagamento-publico';
 import SincronizacaoGoogleCalendar from '@/pages/sincronizacao-google-calendar';
 import SincronizacaoGoogleCalendar2 from '@/pages/sincronizacao-google-calendar-2';
 import SincronizacaoGoogleCalendar3 from '@/pages/sincronizacao-google-calendar-3';
@@ -102,6 +103,8 @@ import { Card } from '@/components/ui/card';
 import { RoleProtectedRoute } from '@/components/role-protected-route';
 import { TenantRouteWrapper } from '@/components/tenant-route-wrapper';
 import { useTenantRouting } from '@/hooks/use-tenant-routing';
+import { useVisualViewportCssVars } from '@/hooks/use-visual-viewport';
+import { MobileBackButton } from '@/components/mobile-back-button';
 
 // Componente de contagem regressiva do Trial
 function TrialCountdown({
@@ -560,6 +563,7 @@ function Router() {
         />
         <Route path='/login' component={LoginCadastroUnificado} />
         <Route path='/recuperar-senha' component={RecuperarSenha} />
+        <Route path='/pagamento/:token' component={PagamentoPublico} />
         <Route path='/rat/:token' component={RatPublic} />
         <Route path='/landing' component={Landing} />
         {/* Rotas públicas de agendamento devem ficar no fim para não capturar rotas internas */}
@@ -577,6 +581,10 @@ function Router() {
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location, navigate] = useLocation();
+  const { currentPath } = useTenantRouting();
+  const currentPathNoQuery = currentPath.split('?')[0];
+  const shouldShowMobileBack =
+    currentPathNoQuery !== '/' && currentPathNoQuery !== '/dashboard';
 
   // Perfis são opcionais - empresa pode usar o sistema sem configurar perfis
 
@@ -606,6 +614,7 @@ function AppContent() {
     'master-admin-login',
     'confirm-email',
     'rat',
+    'pagamento',
     'rat-upload-teste',
     'editor-ordem-servico',
     'meus-dados',
@@ -638,6 +647,10 @@ function AppContent() {
 
     // Rota pública de assinatura da RAT
     if (pathSegments.length === 2 && pathSegments[0] === 'rat') {
+      return true;
+    }
+
+    if (pathSegments.length === 2 && pathSegments[0] === 'pagamento') {
       return true;
     }
 
@@ -859,14 +872,6 @@ function AppContent() {
   const isCompanyUser =
     user?.role === 'company' || (user as any)?.role === 'empresa';
 
-  // Master admin não precisa completar cadastro
-  // IMPORTANTE: Usar apenas profileCompleted como condição principal
-  const needsProfileCompletion =
-    user?.role !== 'super_admin' && !user?.profileCompleted;
-
-  // Não mostrar o Alert se já estiver na página de completar cadastro
-  const isCompletingProfile = location === '/completar-cadastro';
-
   const isCompanyRoute =
     (location === '/' && isCompanyUser) ||
     (location === '/dashboard-empresa' && isCompanyUser) ||
@@ -897,11 +902,12 @@ function AppContent() {
 
   return (
     <SidebarProvider defaultOpen={true} style={style as React.CSSProperties}>
-      <div className='flex h-[100dvh] w-full overflow-hidden'>
+      <div className='flex h-[var(--app-height)] w-full overflow-hidden'>
         <AppSidebar />
         <div className='flex flex-col flex-1 overflow-hidden'>
           <header className='flex items-center justify-between gap-4 p-4 border-b relative shrink-0'>
             <div className='flex items-center gap-4 flex-1 min-w-0'>
+              {shouldShowMobileBack && <MobileBackButton className='shrink-0' />}
               <SidebarTrigger data-testid='button-sidebar-toggle' />
               <PageHeaderSlot />
             </div>
@@ -928,25 +934,7 @@ function AppContent() {
               <ActiveTicketBanner />
             </div>
           )}
-          {needsProfileCompletion && !isCompletingProfile && (
-            <div className='px-4 pt-3 shrink-0'>
-              <Alert>
-                <AlertTitle>Complete seu cadastro</AlertTitle>
-                <AlertDescription>
-                  Para completar seu cadastro, finalize com CPF/CNPJ e telefone.
-                  <div className='mt-3 flex gap-2'>
-                    <Button
-                      size='sm'
-                      onClick={() => navigate('/completar-cadastro')}
-                    >
-                      Completar cadastro
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-          <main className='flex-1 overflow-y-auto p-4 sm:p-6 pb-40 md:pb-6 scroll-smooth'>
+          <main className='flex-1 overflow-y-auto p-4 sm:p-6 pb-[calc(10rem+var(--keyboard-inset))] md:pb-[calc(1.5rem+var(--keyboard-inset))] scroll-smooth'>
             <Router />
           </main>
           <AppSidebarMobileFooter />
@@ -973,6 +961,8 @@ function ChamadosRoute() {
 }
 
 function App() {
+  useVisualViewportCssVars();
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

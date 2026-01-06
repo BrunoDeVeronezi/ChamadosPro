@@ -195,15 +195,9 @@ export function getOAuthClient(redirectUri?: string) {
 }
 
 export function getRedirectUriFromRequest(req: Express.Request): string {
-  // Se há uma variável de ambiente definida, usar ela (prioridade)
-  if (process.env.GOOGLE_REDIRECT_URI) {
-    return process.env.GOOGLE_REDIRECT_URI;
-  }
-
-  // Se há NGROK_URL, usar ela
-  if (process.env.NGROK_URL) {
-    return `${process.env.NGROK_URL}/api/callback`;
-  }
+  const envRedirect = process.env.GOOGLE_REDIRECT_URI;
+  const forceEnv =
+    String(process.env.FORCE_GOOGLE_REDIRECT_URI || '').toLowerCase() === 'true';
 
   // Construir dinamicamente baseado na requisição
   // Isso é importante para mobile onde o hostname pode ser diferente
@@ -222,13 +216,35 @@ export function getRedirectUriFromRequest(req: Express.Request): string {
     host = host.replace(':443', '');
   }
 
+  const requestRedirectUri = `${protocol}://${host}/api/callback`;
+
   // Detectar se é mobile baseado no User-Agent
   const userAgent = req.get('user-agent') || '';
   const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
 
-  // Para mobile/simuladores, garantir que o redirect URI seja exatamente como configurado no Google Console
-  // O Google é muito estrito com redirect URIs - devem corresponder exatamente
-  const redirectUri = `${protocol}://${host}/api/callback`;
+  const shouldUseEnvRedirect = () => {
+    if (!envRedirect) return false;
+    if (forceEnv) return true;
+    try {
+      const parsed = new URL(envRedirect);
+      const envHost = parsed.host;
+      const envProtocol = parsed.protocol.replace(':', '');
+      return envHost === host && envProtocol === protocol;
+    } catch {
+      return false;
+    }
+  };
+
+  if (envRedirect && shouldUseEnvRedirect()) {
+    return envRedirect;
+  }
+
+  if (process.env.NGROK_URL) {
+    const ngrokRedirect = `${process.env.NGROK_URL}/api/callback`;
+    if (host.includes('ngrok-free.dev') || host.includes('ngrok.io')) {
+      return ngrokRedirect;
+    }
+  }
 
   console.log('[OAUTH] Construindo redirect URI:', {
     protocol,
@@ -238,7 +254,9 @@ export function getRedirectUriFromRequest(req: Express.Request): string {
     originalHost: req.get('host'),
     userAgent: userAgent.substring(0, 50),
     isMobile,
-    redirectUri,
+    envRedirect,
+    forceEnv,
+    redirectUri: requestRedirectUri,
     // Log adicional para debug mobile
     allHeaders: {
       'x-forwarded-proto': req.get('x-forwarded-proto'),
@@ -249,7 +267,7 @@ export function getRedirectUriFromRequest(req: Express.Request): string {
     },
   });
 
-  return redirectUri;
+  return requestRedirectUri;
 }
 
 export async function setupAuth(app: Express) {

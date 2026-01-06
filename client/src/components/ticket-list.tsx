@@ -1873,7 +1873,7 @@ export function TicketList({
               data-testid={`card-ticket-${ticket.id}`}
             >
               <div className='p-4 border-b border-gray-200 dark:border-gray-700'>
-                <div className='flex justify-between items-start'>
+                <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
                   <div className='flex items-center gap-2'>
                     <Checkbox
                       checked={selectedTickets.has(ticket.id)}
@@ -1881,14 +1881,13 @@ export function TicketList({
                       onClick={(e) => e.stopPropagation()}
                       id={`checkbox-${ticket.id}`}
                     />
+                    <p className='text-gray-500 dark:text-gray-400 text-sm font-normal'>
+                      {(ticket as any).ticketNumber
+                        ? `#${(ticket as any).ticketNumber}`
+                        : `#${ticket.id.slice(0, 8)}`}
+                    </p>
                   </div>
-                  <div className='flex items-center gap-2'>
-                  <p className='text-gray-500 dark:text-gray-400 text-sm font-normal'>
-                    {(ticket as any).ticketNumber
-                      ? `#${(ticket as any).ticketNumber}`
-                      : `#${ticket.id.slice(0, 8)}`}
-                  </p>
-                  <div className='flex items-center gap-2'>
+                  <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end'>
                     {typeBadge && (
                       <span
                         className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${
@@ -1915,7 +1914,6 @@ export function TicketList({
                       {statusInfo.label}
                     </span>
                   </div>
-                  </div>
                 </div>
                 <p
                   className='text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] mt-2'
@@ -1941,11 +1939,13 @@ export function TicketList({
                   </span>
                 </div>
                 {fullAddress && (
-                  <div className='flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400'>
+                  <div className='flex flex-wrap items-start gap-2 text-sm text-gray-600 dark:text-gray-400'>
                     <Navigation className='h-4 w-4 mt-0.5 flex-shrink-0' />
-                    <div className='flex-1 flex items-center gap-2'>
-                      <span className='flex-1'>{fullAddress}</span>
-                      <div className='flex gap-1'>
+                    <div className='flex min-w-0 flex-1 flex-wrap items-start gap-2'>
+                      <span className='min-w-0 flex-1 break-words'>
+                        {fullAddress}
+                      </span>
+                      <div className='flex shrink-0 gap-1'>
                         <Button
                           type='button'
                           size='sm'
@@ -2147,7 +2147,7 @@ export function TicketList({
                   </div>
                 )}
               </div>
-              <div className='p-4 mt-auto bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 justify-end'>
+              <div className='p-4 mt-auto bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2 justify-start sm:justify-end'>
                 {!isFinished && (
                   <>
                     {!timer?.running && !isInExecution && isCalculationsActive && (

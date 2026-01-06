@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { ChamadosProLogo } from '@/components/chamados-pro-logo';
+import { maskCNPJ, maskCPF, maskPhone } from '@/lib/masks';
 
 function GoogleGlyph() {
   return (
@@ -34,11 +35,14 @@ function GoogleGlyph() {
 }
 
 export default function LoginCadastroUnificado() {
-  const { login, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [authMode, setAuthMode] = useState<'entrar' | 'cadastrar'>('entrar');
-  const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [document, setDocument] = useState('');
+  const [documentType, setDocumentType] = useState<'cpf' | 'cnpj' | null>(null);
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,7 +54,9 @@ export default function LoginCadastroUnificado() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
-  const [fullNameError, setFullNameError] = useState<string | null>(null);
+  const [companyNameError, setCompanyNameError] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   // Estados para modais de redirecionamento
   const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
   const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
@@ -121,16 +127,33 @@ export default function LoginCadastroUnificado() {
     }
   };
 
-  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCompanyNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setFullName(value);
-    
-    // Validação em tempo real apenas se já digitou algo e depois apagou
-    if (value.length === 0 && authMode === 'cadastrar') {
-      // Não mostrar erro enquanto está digitando, apenas se tentar submeter vazio
-      setFullNameError(null);
+    setCompanyName(value);
+    if (value.trim()) {
+      setCompanyNameError(null);
+    }
+  };
+
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    if (raw.length <= 11) {
+      setDocumentType('cpf');
+      setDocument(maskCPF(raw));
     } else {
-      setFullNameError(null);
+      setDocumentType('cnpj');
+      setDocument(maskCNPJ(raw));
+    }
+    if (raw.length === 11 || raw.length === 14) {
+      setDocumentError(null);
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskPhone(e.target.value);
+    setPhone(masked);
+    if (masked.replace(/\D/g, '').length >= 10) {
+      setPhoneError(null);
     }
   };
 
@@ -141,7 +164,9 @@ export default function LoginCadastroUnificado() {
     setEmailError(null);
     setPasswordError(null);
     setConfirmPasswordError(null);
-    setFullNameError(null);
+    setCompanyNameError(null);
+    setDocumentError(null);
+    setPhoneError(null);
 
     try {
       if (authMode === 'entrar') {
@@ -151,6 +176,10 @@ export default function LoginCadastroUnificado() {
           setIsSubmitting(false);
           return;
         }
+
+
+
+
 
         // Login com email/senha
         const response = await fetch('/api/auth/login', {
@@ -236,15 +265,27 @@ export default function LoginCadastroUnificado() {
         // Validações de cadastro
         let hasErrors = false;
 
-        // Validação de nome completo
-        if (!fullName.trim()) {
-          setFullNameError('Nome completo é obrigatório');
+        if (!companyName.trim()) {
+          setCompanyNameError('Nome da empresa ?? obrigat??rio');
           hasErrors = true;
         }
+
 
         // Validação de email
         if (!validateEmail(email)) {
           setEmailError('E-mail inválido');
+          hasErrors = true;
+        }
+
+        const cleanDocument = document.replace(/\D/g, '');
+        if (cleanDocument.length !== 11 && cleanDocument.length !== 14) {
+          setDocumentError('Informe um CPF ou CNPJ v?lido');
+          hasErrors = true;
+        }
+
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length < 10) {
+          setPhoneError('Telefone com DDD ? obrigat?rio');
           hasErrors = true;
         }
 
@@ -269,13 +310,8 @@ export default function LoginCadastroUnificado() {
         // O sistema cria como 'technician' por padrão e o usuário pode fazer upgrade depois
         console.log('[FRONTEND] Tentando cadastrar:', {
           email,
-          fullName,
         });
 
-        // Separar nome e sobrenome
-        const nameParts = fullName.trim().split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
 
         const response = await fetch('/api/auth/register', {
           method: 'POST',
@@ -287,8 +323,10 @@ export default function LoginCadastroUnificado() {
             email,
             password,
             userType: 'technician', // Padrão: técnico (pode fazer upgrade depois)
-            firstName: firstName || email.split('@')[0], // Usar nome completo ou fallback
-            lastName: lastName,
+            companyName: companyName.trim(),
+            phone: cleanPhone,
+            cpf: cleanDocument.length === 11 ? cleanDocument : undefined,
+            cnpj: cleanDocument.length === 14 ? cleanDocument : undefined,
             trialDeviceId: getTrialDeviceId(),
           }),
         });
@@ -421,13 +459,18 @@ export default function LoginCadastroUnificado() {
                       setAuthMode('entrar');
                       setPassword('');
                       setConfirmPassword('');
-                      setFullName('');
+                      setCompanyName('');
+                      setDocument('');
+                      setDocumentType(null);
+                      setPhone('');
                       setEmail('');
                       setSpecialError(null);
                       setEmailError(null);
                       setPasswordError(null);
                       setConfirmPasswordError(null);
-                      setFullNameError(null);
+                      setCompanyNameError(null);
+                      setDocumentError(null);
+                      setPhoneError(null);
                     }}
                     className='text-white hover:text-gray-300 transition-colors flex items-center gap-2 mb-6'
                   >
@@ -498,30 +541,95 @@ export default function LoginCadastroUnificado() {
                   <div className='space-y-2'>
                     <Label
                       className='block text-sm font-medium text-white'
-                      htmlFor='fullName'
+                      htmlFor='companyName'
                     >
-                      Nome Completo
+                      Nome da Empresa
                     </Label>
                     <Input
                       className={`block w-full h-12 px-4 rounded-lg bg-gray-800/50 text-white placeholder:text-gray-500 border focus:ring-[#3880f5] focus:border-[#3880f5] ${
-                        fullNameError
+                        companyNameError
                           ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                           : 'border-gray-600'
                       }`}
-                      id='fullName'
-                      placeholder='Nome Completo'
+                      id='companyName'
+                      placeholder='Minha Empresa LTDA'
                       type='text'
-                      value={fullName}
-                      onChange={handleFullNameChange}
+                      value={companyName}
+                      onChange={handleCompanyNameChange}
                       onBlur={() => {
-                        if (!fullName.trim() && authMode === 'cadastrar') {
-                          setFullNameError('Nome completo é obrigatório');
+                        if (!companyName.trim() && authMode === 'cadastrar') {
+                          setCompanyNameError('Nome da empresa ?? obrigat??rio');
                         }
                       }}
                       required
                     />
-                    {fullNameError && (
-                      <p className='text-red-500 text-sm'>{fullNameError}</p>
+                    {companyNameError && (
+                      <p className='text-red-500 text-sm'>{companyNameError}</p>
+                    )}
+                  </div>
+                )}
+
+                {authMode === 'cadastrar' && (
+                  <div className='space-y-2'>
+                    <Label
+                      className='block text-sm font-medium text-white'
+                      htmlFor='document'
+                    >
+                      CPF ou CNPJ
+                    </Label>
+                    <Input
+                      className={`block w-full h-12 px-4 rounded-lg bg-gray-800/50 text-white placeholder:text-gray-500 border focus:ring-[#3880f5] focus:border-[#3880f5] ${
+                        documentError
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-600'
+                      }`}
+                      id='document'
+                      placeholder={documentType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                      type='text'
+                      value={document}
+                      onChange={handleDocumentChange}
+                      onBlur={() => {
+                        const digits = document.replace(/\D/g, '');
+                        if (digits.length !== 11 && digits.length !== 14) {
+                          setDocumentError('Informe um CPF ou CNPJ v??lido');
+                        }
+                      }}
+                      required
+                    />
+                    {documentError && (
+                      <p className='text-red-500 text-sm'>{documentError}</p>
+                    )}
+                  </div>
+                )}
+
+                {authMode === 'cadastrar' && (
+                  <div className='space-y-2'>
+                    <Label
+                      className='block text-sm font-medium text-white'
+                      htmlFor='phone'
+                    >
+                      Telefone (com DDD)
+                    </Label>
+                    <Input
+                      className={`block w-full h-12 px-4 rounded-lg bg-gray-800/50 text-white placeholder:text-gray-500 border focus:ring-[#3880f5] focus:border-[#3880f5] ${
+                        phoneError
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                          : 'border-gray-600'
+                      }`}
+                      id='phone'
+                      placeholder='(00) 00000-0000'
+                      type='tel'
+                      value={phone}
+                      onChange={handlePhoneChange}
+                      onBlur={() => {
+                        if (phone.replace(/\D/g, '').length < 10) {
+                          setPhoneError('Telefone com DDD ?? obrigat??rio');
+                        }
+                      }}
+                      required
+                    />
+                    {phoneError && (
+                      <p className='text-red-500 text-sm'>{phoneError}</p>
                     )}
                   </div>
                 )}
@@ -692,13 +800,18 @@ export default function LoginCadastroUnificado() {
                         setAuthMode('cadastrar');
                         setPassword('');
                         setConfirmPassword('');
-                        setFullName('');
+                        setCompanyName('');
+                        setDocument('');
+                        setDocumentType(null);
+                        setPhone('');
                         setEmail('');
                         setSpecialError(null);
                         setEmailError(null);
                         setPasswordError(null);
                         setConfirmPasswordError(null);
-                        setFullNameError(null);
+                        setCompanyNameError(null);
+                        setDocumentError(null);
+                        setPhoneError(null);
                       }}
                       className='text-[#3880f5] hover:underline font-medium'
                     >
@@ -713,13 +826,18 @@ export default function LoginCadastroUnificado() {
                         setAuthMode('entrar');
                         setPassword('');
                         setConfirmPassword('');
-                        setFullName('');
+                        setCompanyName('');
+                        setDocument('');
+                        setDocumentType(null);
+                        setPhone('');
                         setEmail('');
                         setSpecialError(null);
                         setEmailError(null);
                         setPasswordError(null);
                         setConfirmPasswordError(null);
-                        setFullNameError(null);
+                        setCompanyNameError(null);
+                        setDocumentError(null);
+                        setPhoneError(null);
                       }}
                       className='text-[#3880f5] hover:underline font-medium'
                     >

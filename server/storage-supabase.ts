@@ -22,6 +22,8 @@ import type {
   InsertFinancialRecord,
   IntegrationSettings,
   InsertIntegrationSettings,
+  PaymentIntegration,
+  InsertPaymentIntegration,
   ReminderLog,
   InsertReminderLog,
   LocalEvent,
@@ -200,7 +202,7 @@ function toSnakeCase(obj: any): any {
 export class SupabaseStorage implements IStorage {
   // Campos vÃ¡lidos da tabela users (sem company_logo_url que nÃ£o existe)
   private readonly USER_SELECT_FIELDS =
-    'id, email, first_name, last_name, profile_image_url, role, public_slug, company_name, company_logo_url, tenant_slug, cpf, cnpj, phone, zip_code, street_address, address_number, address_complement, neighborhood, city, state, created_at, updated_at, email_confirmed, email_confirmation_expires_at, profile_completed, trial_device_id, trial_ip, trial_claimed_at';
+    'id, email, first_name, last_name, profile_image_url, role, public_slug, company_name, company_logo_url, tenant_slug, cpf, cnpj, birth_date, phone, zip_code, street_address, address_number, address_complement, neighborhood, city, state, created_at, updated_at, email_confirmed, email_confirmation_expires_at, profile_completed, trial_device_id, trial_ip, trial_claimed_at';
 
   // Users
   async getUser(id: string): Promise<User | undefined> {
@@ -746,6 +748,8 @@ export class SupabaseStorage implements IStorage {
       'company_logo_url',
       'tenant_slug',
       'cpf',
+      'cnpj',
+      'birth_date',
       'phone',
       'zip_code',
       'street_address',
@@ -862,6 +866,22 @@ export class SupabaseStorage implements IStorage {
       apiData.cpf = (existing as any).cpf || null;
     } else {
       apiData.cpf = null;
+    }
+
+    if ('cnpj' in userDataToInsert) {
+      apiData.cnpj = userDataToInsert.cnpj || null;
+    } else if (existing) {
+      apiData.cnpj = (existing as any).cnpj || null;
+    } else {
+      apiData.cnpj = null;
+    }
+
+    if ('birth_date' in userDataToInsert) {
+      apiData.birth_date = userDataToInsert.birth_date || null;
+    } else if (existing) {
+      apiData.birth_date = (existing as any).birthDate || null;
+    } else {
+      apiData.birth_date = null;
     }
 
     if ('zip_code' in userDataToInsert) {
@@ -2434,7 +2454,7 @@ export class SupabaseStorage implements IStorage {
 
     return data ? (toCamelCase(data) as IntegrationSettings) : undefined;
   }
-async createOrUpdateIntegrationSettings(
+  async createOrUpdateIntegrationSettings(
     settingsData: InsertIntegrationSettings
   ): Promise<IntegrationSettings> {
     const { userId, ...updateData } = settingsData;
@@ -2453,6 +2473,48 @@ async createOrUpdateIntegrationSettings(
     }
 
     return this.createIntegrationSettings(settingsData);
+  }
+
+  // Payment Integrations (OAuth / PSP)
+  async getPaymentIntegration(
+    userId: string,
+    provider: string
+  ): Promise<PaymentIntegration | undefined> {
+    const { data, error } = await supabase
+      .from('payment_integrations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('provider', provider)
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('[getPaymentIntegration] Erro:', error);
+      return undefined;
+    }
+
+    return data ? (toCamelCase(data) as PaymentIntegration) : undefined;
+  }
+
+  async upsertPaymentIntegration(
+    integrationData: InsertPaymentIntegration
+  ): Promise<PaymentIntegration> {
+    const dataToInsert = toSnakeCase(integrationData);
+
+    const { data, error } = await supabase
+      .from('payment_integrations')
+      .upsert(dataToInsert, { onConflict: 'user_id,provider' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[upsertPaymentIntegration] Erro:', error);
+      throw new Error(
+        `Erro ao salvar integracao de pagamento: ${error.message}`
+      );
+    }
+
+    return toCamelCase(data) as PaymentIntegration;
   }
 
   // Reminder Logs

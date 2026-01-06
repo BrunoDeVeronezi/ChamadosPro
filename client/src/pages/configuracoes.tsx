@@ -258,6 +258,43 @@ export default function Configuracoes() {
     perTicket: false,
     clientTypes: ['PF', 'PJ', 'EMPRESA_PARCEIRA'],
   });
+  const calculationGuideSteps = [
+    {
+      id: 'config',
+      title: '1. Habilitar calculos e faturamento',
+      description: 'Ative cronometro, KM e valores.',
+      image: '/ilustracoes/guia-chamados-01.png',
+      alt: 'Configuracoes de calculo e faturamento',
+    },
+    {
+      id: 'start',
+      title: '2. Iniciar atendimento',
+      description: 'Comece o cronometro direto no card do chamado.',
+      image: '/ilustracoes/guia-chamados-02.png',
+      alt: 'Botao iniciar atendimento no chamado',
+    },
+    {
+      id: 'running',
+      title: '3. Atendimento em andamento',
+      description: 'Status iniciado e tempo visivel no card.',
+      image: '/ilustracoes/guia-chamados-03.png',
+      alt: 'Status iniciado no chamado',
+    },
+    {
+      id: 'finish',
+      title: '4. Finalizar atendimento',
+      description: 'Revise servicos, horas extras e KM.',
+      image: '/ilustracoes/guia-chamados-04.png',
+      alt: 'Modal de finalizar atendimento com valores',
+    },
+    {
+      id: 'receipt',
+      title: '5. Emitir recibo',
+      description: 'Ajuste o total final e confirme.',
+      image: '/ilustracoes/guia-chamados-05.png',
+      alt: 'Modal de finalizar atendimento com recibo',
+    },
+  ];
 
   useEffect(() => {
     if (settings) {
@@ -960,6 +997,41 @@ export default function Configuracoes() {
                         'Salvar Configurações'
                       )}
                     </Button>
+                  </div>
+                  <div className='mt-6 rounded-xl border bg-muted/40 p-4'>
+                    <div className='space-y-1'>
+                      <p className='text-sm font-semibold'>
+                        Guia visual do faturamento
+                      </p>
+                      <p className='text-xs text-muted-foreground'>
+                        Sequencia resumida do fluxo de calculos e cobranca.
+                      </p>
+                    </div>
+                    <div className='mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+                      {calculationGuideSteps.map((step) => (
+                        <div
+                          key={step.id}
+                          className='space-y-3 rounded-lg border bg-background p-3 shadow-sm'
+                        >
+                          <div className='space-y-1'>
+                            <p className='text-xs font-semibold text-slate-700 dark:text-slate-200'>
+                              {step.title}
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              {step.description}
+                            </p>
+                          </div>
+                          <div className='overflow-hidden rounded-md border bg-white dark:bg-slate-950'>
+                            <img
+                              src={step.image}
+                              alt={step.alt}
+                              loading='lazy'
+                              className='h-auto w-full'
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}

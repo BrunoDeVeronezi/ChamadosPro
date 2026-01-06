@@ -31,6 +31,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { usePaidAccess } from '@/hooks/use-paid-access';
+import { useAuth } from '@/hooks/use-auth';
+import { ReceiptPreviewDialog } from '@/components/receipt-preview-dialog';
+import { buildServiceSummary, coerceServiceItems } from '@/utils/service-items';
 import {
   MessageSquare,
   DollarSign,
@@ -57,6 +60,7 @@ export function FinancialActions({
 }: FinancialActionsProps) {
   const { toast } = useToast();
   const { requirePaid } = usePaidAccess();
+  const { user } = useAuth();
   const [sendPaymentLinkTicket, setSendPaymentLinkTicket] = useState<any>(null);
   const [sendPaymentMethod, setSendPaymentMethod] = useState<
     'whatsapp' | 'email' | null
@@ -65,6 +69,13 @@ export function FinancialActions({
   const [paymentLinkEmail, setPaymentLinkEmail] = useState('');
   const [paymentLinkMessage, setPaymentLinkMessage] = useState('');
   const [confirmReceivePayment, setConfirmReceivePayment] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [receiptAutoShare, setReceiptAutoShare] = useState<
+    'whatsapp' | null
+  >(null);
+  const [receiptData, setReceiptData] = useState<any>(null);
+  const [receiptShareMessage, setReceiptShareMessage] = useState('');
+  const [receiptWhatsAppPhone, setReceiptWhatsAppPhone] = useState('');
   const [showMissingDocumentAlert, setShowMissingDocumentAlert] =
     useState(false);
   const [missingDocumentClientId, setMissingDocumentClientId] = useState<
@@ -101,6 +112,12 @@ export function FinancialActions({
   // Buscar clientes
   const { data: clients = [] } = useQuery<any[]>({
     queryKey: ['/api/clients'],
+  });
+
+  const { data: integrationSettings } = useQuery<{
+    pixKey?: string | null;
+  }>({
+    queryKey: ['/api/integration-settings'],
   });
 
   // Função para gerar mensagem padrão
@@ -189,6 +206,99 @@ export function FinancialActions({
     message += `\n\nOs dados do PIX e o QR Code serao adicionados automaticamente.`;
 
     return message;
+  };
+
+  const parseAmount = (value: any) => {
+    const numberValue =
+      typeof value === 'number'
+        ? value
+        : parseFloat(String(value || '0').replace(',', '.'));
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
+
+  const handleSendWhatsAppImage = async () => {
+    if (
+      !requirePaid({
+        feature: 'Envio por WhatsApp',
+        description:
+          'Envios por WhatsApp estao disponiveis apenas na versao paga.',
+      })
+    ) {
+      return;
+    }
+
+    const pixKey = (integrationSettings?.pixKey || '').trim();
+    if (!pixKey) {
+      toast({
+        variant: 'destructive',
+        title: 'Chave PIX nao configurada',
+        description: 'Cadastre a chave PIX antes de enviar a cobranca.',
+      });
+      return;
+    }
+
+    if (!ticket) {
+      toast({
+        variant: 'destructive',
+        title: 'Chamado nao encontrado',
+        description: 'Recarregue a pagina e tente novamente.',
+      });
+      return;
+    }
+
+    const ticketClient = clients.find((c) => c.id === ticket.clientId);
+    const serviceItems = coerceServiceItems(ticket.serviceItems);
+    const serviceName = buildServiceSummary(
+      serviceItems,
+      ticket.service?.name || ticket.serviceName || 'Servico Prestado'
+    );
+    const amount = parseAmount(ticket.totalAmount ?? ticket.ticketValue ?? 0);
+    const ticketRef =
+      ticket.ticketNumber || ticket.id?.slice(0, 8) || 'sem-id';
+    const clientName =
+      ticketClient?.name || ticket.client?.name || 'Cliente';
+    const shareMessage = `Segue o recibo do chamado ${ticketRef}.`;
+
+    setReceiptShareMessage(shareMessage);
+    setReceiptWhatsAppPhone(
+      ticketClient?.phone || ticket.clientPhone || ''
+    );
+    setReceiptAutoShare('whatsapp');
+    setReceiptData({
+      company: {
+        name: user?.companyName || 'Sua Empresa',
+        cnpj: user?.cnpj,
+        cpf: user?.cpf,
+        phone: user?.phone,
+        address: `${user?.streetAddress || ''}, ${
+          user?.addressNumber || ''
+        } ${user?.neighborhood || ''}`.trim(),
+        city: user?.city,
+      },
+      client: {
+        name: clientName,
+        email: ticketClient?.email || ticket.clientEmail,
+        phone: ticketClient?.phone || ticket.clientPhone,
+        document: ticketClient?.document || ticket.clientDocument,
+      },
+      ticket: {
+        id: ticket.id,
+        serviceName,
+        serviceItems,
+        date:
+          ticket.completedAt ||
+          ticket.stoppedAt ||
+          ticket.scheduledDate ||
+          new Date().toISOString(),
+        amount,
+        description: ticket.description || '',
+        warranty: ticket.warranty,
+        kmTotal: ticket.kmTotal,
+        kmRate: ticket.kmRate,
+        extraExpenses: ticket.extraExpenses,
+      },
+    });
+    setIsReceiptModalOpen(true);
   };
 
   // Preencher dados automaticamente quando o modal abrir
@@ -539,6 +649,22 @@ export function FinancialActions({
                 >
                   <MessageCircle className='h-4 w-4 mr-2' />
                   Via WhatsApp
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    handleSendWhatsAppImage();
+                  }}
+                >
+                  <MessageCircle className='h-4 w-4 mr-2' />
+                  WhatsApp (imagem)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    handleSendWhatsAppImage();
+                  }}
+                >
+                  <MessageCircle className='h-4 w-4 mr-2' />
+                  WhatsApp (imagem)
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
@@ -921,6 +1047,23 @@ export function FinancialActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {receiptData && (
+        <ReceiptPreviewDialog
+          isOpen={isReceiptModalOpen}
+          onClose={() => {
+            setIsReceiptModalOpen(false);
+            setReceiptData(null);
+            setReceiptAutoShare(null);
+            setReceiptShareMessage('');
+            setReceiptWhatsAppPhone('');
+          }}
+          data={receiptData}
+          autoShare={receiptAutoShare}
+          shareMessage={receiptShareMessage}
+          whatsappPhone={receiptWhatsAppPhone}
+        />
+      )}
     </>
   );
 }
