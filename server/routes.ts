@@ -295,6 +295,42 @@ function getMercadoPagoRedirectUri(req: any): string {
   return `${protocol}://${host}/api/mercadopago/oauth/callback`;
 }
 
+const META_GRAPH_VERSION_DEFAULT = 'v21.0';
+const META_OAUTH_SCOPE_DEFAULT =
+  'business_management,whatsapp_business_management,whatsapp_business_messaging';
+
+function getWhatsAppRedirectUri(req: any): string {
+  if (process.env.META_REDIRECT_URI) {
+    return process.env.META_REDIRECT_URI;
+  }
+
+  const baseUrl = (process.env.BASE_URL || getRequestBaseUrl(req)).replace(
+    /\/+$/,
+    ''
+  );
+  return `${baseUrl}/api/whatsapp/oauth/callback`;
+}
+
+function getWhatsAppConfig(req: any) {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
+  const graphVersion =
+    process.env.META_GRAPH_VERSION || META_GRAPH_VERSION_DEFAULT;
+  const scope = process.env.META_OAUTH_SCOPE || META_OAUTH_SCOPE_DEFAULT;
+  const redirectUri = getWhatsAppRedirectUri(req);
+  const configured = Boolean(appId && appSecret && configId);
+
+  return {
+    configured,
+    appId,
+    configId,
+    redirectUri,
+    scope,
+    graphVersion,
+  };
+}
+
 function formatCpf(value: string): string | null {
   const digits = normalizeDocumentValue(value);
   if (digits.length !== 11) return null;
@@ -407,6 +443,14 @@ async function findTrialUserByDeviceOrIp(
   return (data || [])[0] || null;
 }
 
+const isSubscriptionActive = (subscription: any, now: Date) => {
+  if (!subscription || subscription.status !== 'active') return false;
+  if (!subscription.endDate) return true;
+  const endDate = new Date(subscription.endDate);
+  if (Number.isNaN(endDate.getTime())) return false;
+  return endDate > now;
+};
+
 async function resolvePlanStatusForUser(
   user: any,
   roleForSubscription?: string
@@ -455,11 +499,20 @@ async function resolvePlanStatusForUser(
       const subscriptions = await storage.getSubscriptionsByEmail(
         normalizedEmail
       );
-      const hasActive = (subscriptions || []).some(
-        (subscription) => subscription.status === 'active'
+      const now = new Date();
+      const hasActive = (subscriptions || []).some((subscription) =>
+        isSubscriptionActive(subscription, now)
       );
+      const hasExpiredActive = (subscriptions || []).some((subscription) => {
+        if (!subscription || subscription.status !== 'active') return false;
+        if (!subscription.endDate) return false;
+        const endDate = new Date(subscription.endDate);
+        return !Number.isNaN(endDate.getTime()) && endDate <= now;
+      });
       if (hasActive) {
         planStatus = 'active';
+      } else if (hasExpiredActive) {
+        planStatus = 'expired';
       }
     }
   } catch (subscriptionError) {
@@ -1485,15 +1538,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { user, record, ticket, client };
   };
 
+  const markFinancialRecordPaid = async (
+    userId: string,
+    referenceId: string,
+    paidAtIso: string
+  ) => {
+    const context = await resolvePaymentContext(userId, referenceId);
+    if (context.error) {
+      return null;
+    }
+    const record = context.record;
+    if (!record) {
+      return null;
+    }
+    if (record.status !== 'paid') {
+      await storage.updateFinancialRecord(record.id, {
+        status: 'paid',
+        paidAt: paidAtIso,
+      });
+    }
+    if (context.ticket?.id) {
+      await storage.updateTicket(context.ticket.id, {
+        paymentDate: paidAtIso,
+      });
+    }
+    return record;
+  };
+
   const buildPaymentMessage = (options: {
     clientName: string;
     ticketRef: string;
     amount: number;
     dueDate?: string;
     pixKey?: string;
-    pixPayload: string;
+    pixPayload?: string;
     paymentUrl?: string;
   }) => {
+    const pixKey = options.pixKey ? options.pixKey.trim() : '';
+    const pixPayload = options.pixPayload ? options.pixPayload.trim() : '';
     const lines = [
       `Ola ${options.clientName || 'cliente'},`,
       `Segue a cobranca do chamado ${options.ticketRef || 'sem-id'}.`,
@@ -1505,14 +1587,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (options.paymentUrl) {
       lines.push(`Pague online (PIX ou cartao): ${options.paymentUrl}`);
     }
-    if (options.pixKey) {
-      lines.push(`PIX: ${options.pixKey}`);
+    if (pixKey) {
+      lines.push(`PIX: ${pixKey}`);
     }
-    lines.push(`Copia e cola: ${options.pixPayload}`);
+    if (pixPayload) {
+      lines.push(`Copia e cola: ${pixPayload}`);
+    }
     return lines.join('\n');
   };
 
   const MERCADOPAGO_API_BASE = 'https://api.mercadopago.com';
+
+  const getPlatformMercadoPagoConfig = () => {
+    const accessToken =
+      process.env.MERCADOPAGO_PLATFORM_ACCESS_TOKEN ||
+      process.env.MERCADOPAGO_ACCESS_TOKEN ||
+      '';
+    const publicKey =
+      process.env.MERCADOPAGO_PLATFORM_PUBLIC_KEY ||
+      process.env.MERCADOPAGO_PUBLIC_KEY ||
+      '';
+    return {
+      accessToken: accessToken || null,
+      publicKey: publicKey || null,
+      enabled: Boolean(accessToken && publicKey),
+    };
+  };
+
+  const resolvePlanRoleForUser = (
+    user: any,
+    planType: any
+  ): 'technician' | 'company' => {
+    const normalizedPlanRole = normalizeSubscriptionRole(planType?.role);
+    if (normalizedPlanRole === 'company') return 'company';
+    if (normalizedPlanRole === 'technician') return 'technician';
+    const rawRole = String(user?.role || '').toLowerCase();
+    return rawRole === 'company' || rawRole === 'empresa'
+      ? 'company'
+      : 'technician';
+  };
+
+  const computePlanEndDate = (planType: any, startDate: Date) => {
+    const endDate = new Date(startDate);
+    const billingCycle = String(planType?.billingCycle || 'monthly').toLowerCase();
+    if (billingCycle.includes('year')) {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+    return endDate;
+  };
+
+  const computePlanEndDateFromMonths = (
+    planType: any,
+    startDate: Date,
+    monthsToAdd: number
+  ) => {
+    const safeMonths = Math.max(1, Math.min(5, Math.round(monthsToAdd || 1)));
+    const billingCycle = String(planType?.billingCycle || 'monthly').toLowerCase();
+    const cycleMonths = billingCycle.includes('year') ? 12 : 1;
+    const totalMonths = safeMonths * cycleMonths;
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + totalMonths);
+    return endDate;
+  };
+
+  const ensureMercadoPagoPlanSubscription = async (options: {
+    paymentId: string | number;
+    paymentStatus: string | null;
+    paymentMethodId?: string | null;
+    amount: number;
+    user: any;
+    planType: any;
+    monthsToAdd?: number;
+    discountPercent?: number;
+    grossAmount?: number;
+  }) => {
+    const paymentId = String(options.paymentId || '');
+    if (!paymentId) return null;
+
+    const originalEmail = normalizeEmailAddress(options.user?.email || '');
+    if (!originalEmail) return null;
+
+    const now = new Date();
+    const monthsToAdd = Math.max(1, Math.min(5, Math.round(options.monthsToAdd || 1)));
+    const endDateBase = new Date(now);
+    const role = resolvePlanRoleForUser(options.user, options.planType);
+
+    const { data: existing, error: existingError } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('payment_gateway', 'mercadopago')
+      .eq('payment_gateway_subscription_id', paymentId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error('[Subscriptions] Erro ao buscar pagamento MP:', existingError);
+    }
+
+    const subscriptions = await storage.getSubscriptionsByEmail(originalEmail);
+    const activeSubscription = (subscriptions || []).find((subscription) =>
+      isSubscriptionActive(subscription, now)
+    );
+    const activeEndDate = activeSubscription?.endDate
+      ? new Date(activeSubscription.endDate)
+      : null;
+    const effectiveBaseDate =
+      activeEndDate && !Number.isNaN(activeEndDate.getTime()) && activeEndDate > now
+        ? activeEndDate
+        : endDateBase;
+    const endDate = computePlanEndDateFromMonths(
+      options.planType,
+      effectiveBaseDate,
+      monthsToAdd
+    );
+
+    const metadata = {
+      ...(existing?.metadata || {}),
+      mp_payment_id: paymentId,
+      mp_payment_status: options.paymentStatus || null,
+      mp_payment_method: options.paymentMethodId || null,
+      mp_amount: options.amount,
+      mp_gross_amount: options.grossAmount ?? null,
+      mp_discount_percent: options.discountPercent ?? null,
+      mp_months: monthsToAdd,
+      activated_at: now.toISOString(),
+    };
+
+    if (existing?.id) {
+      const existingEndDate = existing.endDate
+        ? new Date(existing.endDate)
+        : endDate;
+      const updated = await storage.updateSubscription(existing.id, {
+        status: 'active',
+        endDate: existingEndDate,
+        paymentGateway: 'mercadopago',
+        paymentGatewaySubscriptionId: paymentId,
+        metadata,
+      });
+      return updated || existing;
+    }
+
+    if (activeSubscription?.id) {
+      const updated = await storage.updateSubscription(activeSubscription.id, {
+        status: 'active',
+        endDate,
+        paymentGateway: 'mercadopago',
+        paymentGatewaySubscriptionId: paymentId,
+        planTypeId: options.planType?.id || activeSubscription.planTypeId,
+        metadata: {
+          ...(activeSubscription.metadata || {}),
+          ...metadata,
+        },
+      });
+      return updated || activeSubscription;
+    }
+
+    await supabase
+      .from('subscriptions')
+      .update({
+        status: 'expired',
+        end_date: now.toISOString(),
+        updated_at: now.toISOString(),
+      })
+      .eq('email', originalEmail)
+      .eq('status', 'active');
+
+    const subscription = await storage.createSubscription({
+      email: originalEmail,
+      role,
+      planTypeId: options.planType?.id,
+      status: 'active',
+      paymentGateway: 'mercadopago',
+      paymentGatewayCustomerId: null,
+      paymentGatewaySubscriptionId: paymentId,
+      startDate: now,
+      endDate,
+      metadata,
+    });
+
+    return subscription;
+  };
 
   const getMercadoPagoAccessToken = async (userId: string) => {
     const integration = await storage.getPaymentIntegration(
@@ -1597,6 +1853,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     description: string;
     client: any;
     user: any;
+    externalReference?: string;
+    metadata?: Record<string, any>;
+    notificationUrl?: string;
   }) => {
     const tokenInfo = await getMercadoPagoAccessToken(options.userId);
     if (!tokenInfo?.accessToken) {
@@ -1630,6 +1889,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const payerEmail =
       options.client?.email || options.user?.email || 'contato@cliente.com';
 
+    const paymentPayload: Record<string, any> = {
+      transaction_amount: Number(options.amount),
+      description: options.description,
+      payment_method_id: 'pix',
+      external_reference: options.externalReference || options.ticketRef,
+      payer: {
+        email: payerEmail,
+        first_name: firstName,
+        last_name: lastName,
+        identification: {
+          type: documentType,
+          number: clientDocument,
+        },
+      },
+    };
+
+    if (options.metadata) {
+      paymentPayload.metadata = options.metadata;
+    }
+    if (options.notificationUrl) {
+      paymentPayload.notification_url = options.notificationUrl;
+    }
+
     const paymentResponse = await fetch(
       `${MERCADOPAGO_API_BASE}/v1/payments`,
       {
@@ -1639,21 +1921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'Content-Type': 'application/json',
           'X-Idempotency-Key': randomUUID(),
         },
-        body: JSON.stringify({
-          transaction_amount: Number(options.amount),
-          description: options.description,
-          payment_method_id: 'pix',
-          external_reference: options.ticketRef,
-          payer: {
-            email: payerEmail,
-            first_name: firstName,
-            last_name: lastName,
-            identification: {
-              type: documentType,
-              number: clientDocument,
-            },
-          },
-        }),
+        body: JSON.stringify(paymentPayload),
       }
     );
 
@@ -1717,6 +1985,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentData?.message || 'Erro ao criar pagamento no Mercado Pago.'
       );
       error.code = paymentData?.error || 'MERCADOPAGO_PAYMENT_ERROR';
+      error.details = paymentData;
+      throw error;
+    }
+
+    return paymentData;
+  };
+
+  const fetchMercadoPagoPayment = async (
+    accessToken: string,
+    paymentId: string | number
+  ) => {
+    const paymentResponse = await fetch(
+      `${MERCADOPAGO_API_BASE}/v1/payments/${paymentId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const paymentData = await paymentResponse.json();
+
+    if (!paymentResponse.ok) {
+      console.error('[MercadoPago] Erro ao consultar pagamento:', paymentData);
+      const error: any = new Error(
+        paymentData?.message || 'Erro ao consultar pagamento no Mercado Pago.'
+      );
+      error.code = paymentData?.error || 'MERCADOPAGO_PAYMENT_FETCH_ERROR';
       error.details = paymentData;
       throw error;
     }
@@ -2247,6 +2545,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[MercadoPago] Erro ao buscar status:', error);
       res.status(500).json({ message: 'Failed to fetch Mercado Pago status' });
     }
+  });
+
+  app.get('/api/whatsapp/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const config = getWhatsAppConfig(req);
+      const settings = await storage.getIntegrationSettings(userId);
+      const status = settings?.whatsappStatus || 'not_connected';
+      const rawExpiresAt = settings?.whatsappTokenExpiresAt
+        ? new Date(settings.whatsappTokenExpiresAt)
+        : null;
+
+      res.json({
+        configured: config.configured,
+        connected: status === 'connected',
+        status,
+        phoneNumberId: settings?.whatsappPhoneNumberId || null,
+        phoneNumber: settings?.whatsappPhoneNumber || null,
+        businessAccountId: settings?.whatsappBusinessAccountId || null,
+        tokenExpiresAt: rawExpiresAt ? rawExpiresAt.toISOString() : null,
+      });
+    } catch (error: any) {
+      console.error('[WhatsApp] Erro ao buscar status:', error);
+      res.status(500).json({ message: 'Failed to fetch WhatsApp status' });
+    }
+  });
+
+  app.get('/api/whatsapp/config', isAuthenticated, async (req: any, res) => {
+    const config = getWhatsAppConfig(req);
+    if (!config.configured) {
+      return res.json({ configured: false });
+    }
+
+    res.json({
+      configured: true,
+      appId: config.appId,
+      configId: config.configId,
+      redirectUri: config.redirectUri,
+      scope: config.scope,
+      graphVersion: config.graphVersion,
+    });
+  });
+
+  app.post(
+    '/api/whatsapp/embedded/exchange',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const code =
+          typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+        if (!code) {
+          return res.status(400).json({ message: 'Codigo ausente.' });
+        }
+
+        const config = getWhatsAppConfig(req);
+        if (!config.configured || !config.appId || !process.env.META_APP_SECRET) {
+          return res.status(500).json({
+            message: 'Credenciais do Meta nao configuradas.',
+          });
+        }
+
+        const graphBaseUrl = `https://graph.facebook.com/${config.graphVersion}`;
+        const tokenParams = new URLSearchParams({
+          client_id: config.appId,
+          client_secret: process.env.META_APP_SECRET,
+          redirect_uri: config.redirectUri,
+          code,
+        });
+        const tokenResponse = await fetch(
+          `${graphBaseUrl}/oauth/access_token?${tokenParams.toString()}`
+        );
+        const tokenData = await tokenResponse.json();
+
+        if (!tokenResponse.ok) {
+          console.error('[WhatsApp] Erro ao trocar token:', tokenData);
+          return res.status(400).json({
+            message: 'Falha ao trocar token com o Meta.',
+            details: tokenData,
+          });
+        }
+
+        const accessToken = tokenData.access_token;
+        if (!accessToken) {
+          return res.status(400).json({
+            message: 'Token nao recebido do Meta.',
+          });
+        }
+
+        const wabaResponse = await fetch(
+          `${graphBaseUrl}/me/whatsapp_business_accounts?fields=id,name&access_token=${encodeURIComponent(
+            accessToken
+          )}`
+        );
+        const wabaData = await wabaResponse.json();
+        if (!wabaResponse.ok) {
+          console.error('[WhatsApp] Erro ao buscar WABA:', wabaData);
+          return res.status(400).json({
+            message: 'Falha ao buscar conta WhatsApp Business.',
+            details: wabaData,
+          });
+        }
+
+        const wabaId = wabaData?.data?.[0]?.id;
+        if (!wabaId) {
+          return res.status(400).json({
+            message: 'Conta WhatsApp Business nao encontrada.',
+          });
+        }
+
+        const phoneResponse = await fetch(
+          `${graphBaseUrl}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${encodeURIComponent(
+            accessToken
+          )}`
+        );
+        const phoneData = await phoneResponse.json();
+        if (!phoneResponse.ok) {
+          console.error('[WhatsApp] Erro ao buscar telefone:', phoneData);
+          return res.status(400).json({
+            message: 'Falha ao buscar numero do WhatsApp Business.',
+            details: phoneData,
+          });
+        }
+
+        const phoneNumberId = phoneData?.data?.[0]?.id || null;
+        const phoneNumber = phoneData?.data?.[0]?.display_phone_number || null;
+        if (!phoneNumberId) {
+          return res.status(400).json({
+            message: 'Numero do WhatsApp Business nao encontrado.',
+          });
+        }
+        const expiresAt = tokenData.expires_in
+          ? new Date(Date.now() + Number(tokenData.expires_in) * 1000)
+          : null;
+
+        await storage.createOrUpdateIntegrationSettings({
+          userId: req.user.id,
+          whatsappStatus: 'connected',
+          whatsappAccessToken: accessToken,
+          whatsappTokenExpiresAt: expiresAt || undefined,
+          whatsappBusinessAccountId: wabaId,
+          whatsappPhoneNumberId: phoneNumberId,
+          whatsappPhoneNumber: phoneNumber,
+        });
+
+        res.json({
+          connected: true,
+          status: 'connected',
+          businessAccountId: wabaId,
+          phoneNumberId,
+          phoneNumber,
+        });
+      } catch (error: any) {
+        console.error('[WhatsApp] Erro ao finalizar conexao:', error);
+        res.status(500).json({ message: 'Failed to connect WhatsApp' });
+      }
+    }
+  );
+
+  app.get('/api/whatsapp/oauth/callback', (_req: any, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(
+      '<!doctype html><html><head><meta charset="utf-8"><title>WhatsApp conectado</title></head><body><p>Conexao concluida. Voce pode fechar esta janela.</p></body></html>'
+    );
   });
 
   app.get(
@@ -3369,12 +3830,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ticket?.client?.name ||
           ticket?.clientName ||
           'cliente';
+        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
+        const webhookBaseUrl = (
+          process.env.BASE_URL || getRequestBaseUrl(req)
+        ).replace(/\/+$/, '');
+        const notificationUrl = webhookBaseUrl
+          ? `${webhookBaseUrl}/api/mercadopago/webhook?source=ticket&user_id=${encodeURIComponent(
+              userId
+            )}&record_id=${encodeURIComponent(
+              record?.id || ''
+            )}&ticket_id=${encodeURIComponent(ticket?.id || '')}`
+          : '';
+        const mpMetadata = {
+          purpose: 'ticket',
+          user_id: userId,
+          record_id: record?.id || null,
+          ticket_id: ticket?.id || null,
+          ticket_ref: ticketRef || null,
+        };
 
         const settings = await storage.getIntegrationSettings(userId);
         const preferredProvider =
           typeof req.body?.provider === 'string'
             ? req.body.provider.trim().toLowerCase()
             : 'auto';
+        const wantsMercadoPago =
+          preferredProvider === 'mercadopago' || preferredProvider === 'auto';
+        const integration = wantsMercadoPago
+          ? await storage.getPaymentIntegration(userId, 'mercadopago')
+          : null;
+        const mpConnected = Boolean(
+          integration?.accessToken &&
+            (integration?.status === 'connected' ||
+              integration?.status === 'active')
+        );
 
         let pixPayload = '';
         let qrCodeDataUrl = '';
@@ -3382,11 +3871,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let provider = 'pix';
         let paymentId: string | null = null;
 
-        if (preferredProvider !== 'pix') {
+        if (wantsMercadoPago && mpConnected) {
+          provider = 'mercadopago';
+          pixKeyLabel = '';
+        } else if (preferredProvider === 'mercadopago') {
+          return res.status(400).json({
+            message: 'Mercado Pago nao conectado.',
+          });
+        }
+
+        if (provider === 'mercadopago') {
           try {
             const mpCharge = await createMercadoPagoPixCharge({
               userId,
               ticketRef: ticketRef || 'sem-id',
+              externalReference: referenceId || ticketRef || 'sem-id',
+              notificationUrl: notificationUrl || undefined,
+              metadata: mpMetadata,
               amount,
               description: `Chamado ${ticketRef || 'sem-id'}`,
               client,
@@ -3395,24 +3896,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (mpCharge?.pixPayload) {
               pixPayload = mpCharge.pixPayload;
               qrCodeDataUrl = mpCharge.qrCodeDataUrl;
-              provider = 'mercadopago';
               paymentId = mpCharge.paymentId || null;
             }
           } catch (error: any) {
-            if (error?.code === 'MISSING_CLIENT_DOCUMENT') {
-              return res.status(400).json({
-                message: error.message,
-                code: 'MISSING_CLIENT_DOCUMENT',
-              });
+            if (error?.code !== 'MISSING_CLIENT_DOCUMENT') {
+              console.error('[MercadoPago] Falha ao gerar PIX:', error);
             }
-            console.error('[MercadoPago] Falha ao gerar PIX:', error);
-            return res.status(500).json({
-              message: error?.message || 'Falha ao gerar PIX no Mercado Pago.',
-            });
           }
         }
 
-        if (!pixPayload) {
+        if (!pixPayload && provider === 'pix') {
           const pixKey = settings?.pixKey ? settings.pixKey.trim() : '';
           if (!pixKey) {
             return res.status(400).json({ message: 'PIX key not configured' });
@@ -3442,7 +3935,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pixKeyLabel = pixKey;
         }
 
-        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
         const paymentUrl =
           provider === 'mercadopago' && referenceId
             ? buildPaymentLinkUrl(
@@ -3547,12 +4039,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ticket?.client?.name ||
           ticket?.clientName ||
           'cliente';
+        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
+        const webhookBaseUrl = (
+          process.env.BASE_URL || getRequestBaseUrl(req)
+        ).replace(/\/+$/, '');
+        const notificationUrl = webhookBaseUrl
+          ? `${webhookBaseUrl}/api/mercadopago/webhook?source=ticket&user_id=${encodeURIComponent(
+              userId
+            )}&record_id=${encodeURIComponent(
+              record?.id || ''
+            )}&ticket_id=${encodeURIComponent(ticket?.id || '')}`
+          : '';
+        const mpMetadata = {
+          purpose: 'ticket',
+          user_id: userId,
+          record_id: record?.id || null,
+          ticket_id: ticket?.id || null,
+          ticket_ref: ticketRef || null,
+        };
 
         const settings = await storage.getIntegrationSettings(userId);
         const preferredProvider =
           typeof req.body?.provider === 'string'
             ? req.body.provider.trim().toLowerCase()
             : 'auto';
+        const wantsMercadoPago =
+          preferredProvider === 'mercadopago' || preferredProvider === 'auto';
+        const integration = wantsMercadoPago
+          ? await storage.getPaymentIntegration(userId, 'mercadopago')
+          : null;
+        const mpConnected = Boolean(
+          integration?.accessToken &&
+            (integration?.status === 'connected' ||
+              integration?.status === 'active')
+        );
 
         let pixPayload = '';
         let qrCodeDataUrl = '';
@@ -3560,11 +4080,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let provider = 'pix';
         let paymentId: string | null = null;
 
-        if (preferredProvider !== 'pix') {
+        if (wantsMercadoPago && mpConnected) {
+          provider = 'mercadopago';
+          pixKeyLabel = '';
+        } else if (preferredProvider === 'mercadopago') {
+          return res.status(400).json({
+            message: 'Mercado Pago nao conectado.',
+          });
+        }
+
+        if (provider === 'mercadopago') {
           try {
             const mpCharge = await createMercadoPagoPixCharge({
               userId,
               ticketRef: ticketRef || 'sem-id',
+              externalReference: referenceId || ticketRef || 'sem-id',
+              notificationUrl: notificationUrl || undefined,
+              metadata: mpMetadata,
               amount,
               description: `Chamado ${ticketRef || 'sem-id'}`,
               client,
@@ -3573,24 +4105,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (mpCharge?.pixPayload) {
               pixPayload = mpCharge.pixPayload;
               qrCodeDataUrl = mpCharge.qrCodeDataUrl;
-              provider = 'mercadopago';
               paymentId = mpCharge.paymentId || null;
             }
           } catch (error: any) {
-            if (error?.code === 'MISSING_CLIENT_DOCUMENT') {
-              return res.status(400).json({
-                message: error.message,
-                code: 'MISSING_CLIENT_DOCUMENT',
-              });
+            if (error?.code !== 'MISSING_CLIENT_DOCUMENT') {
+              console.error('[MercadoPago] Falha ao gerar PIX:', error);
             }
-            console.error('[MercadoPago] Falha ao gerar PIX:', error);
-            return res.status(500).json({
-              message: error?.message || 'Falha ao gerar PIX no Mercado Pago.',
-            });
           }
         }
 
-        if (!pixPayload) {
+        if (!pixPayload && provider === 'pix') {
           const pixKey = settings?.pixKey ? settings.pixKey.trim() : '';
           if (!pixKey) {
             return res.status(400).json({ message: 'PIX key not configured' });
@@ -3620,7 +4144,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pixKeyLabel = pixKey;
         }
 
-        const referenceId = record?.id || ticket?.id || ticketOrRecordId;
         const paymentUrl =
           provider === 'mercadopago' && referenceId
             ? buildPaymentLinkUrl(
@@ -3666,10 +4189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ? `<p><strong>Chave PIX:</strong> ${pixKeyLabel}</p>`
                 : ''
             }
-            <p><strong>Copia e cola:</strong></p>
-            <p style="font-family: monospace; font-size: 12px; word-break: break-all;">${pixPayload}</p>
-            <p><strong>QR Code PIX:</strong></p>
-            <img src="${qrCodeDataUrl}" alt="QR Code PIX" style="width: 220px; height: 220px;" />
+            ${
+              pixPayload
+                ? `<p><strong>Copia e cola:</strong></p>
+            <p style="font-family: monospace; font-size: 12px; word-break: break-all;">${pixPayload}</p>`
+                : ''
+            }
+            ${
+              qrCodeDataUrl
+                ? `<p><strong>QR Code PIX:</strong></p>
+            <img src="${qrCodeDataUrl}" alt="QR Code PIX" style="width: 220px; height: 220px;" />`
+                : ''
+            }
           </div>
         `;
 
@@ -3862,6 +4393,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           record?.description ||
           ticket?.description ||
           `Chamado ${ticketRef || 'sem-id'}`;
+        const referenceId =
+          record?.id || ticket?.id || payload.referenceId || ticketRef || '';
+        const webhookBaseUrl = (
+          process.env.BASE_URL || getRequestBaseUrl(req)
+        ).replace(/\/+$/, '');
 
         const payerFromForm = formData.payer || {};
         const payerEmail =
@@ -3903,13 +4439,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transaction_amount: amount,
           description,
           payment_method_id: paymentMethodId,
-          external_reference: ticketRef || record?.id || ticket?.id,
+          external_reference: referenceId,
           payer: {
             email: payerEmail,
             identification: {
               type: documentType,
               number: documentNumber,
             },
+          },
+          metadata: {
+            purpose: 'ticket',
+            user_id: payload.userId,
+            record_id: record?.id || null,
+            ticket_id: ticket?.id || null,
+            ticket_ref: ticketRef || null,
           },
         };
 
@@ -3934,6 +4477,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (formData.installments) {
           paymentPayload.installments = Number(formData.installments);
+        }
+        if (webhookBaseUrl) {
+          paymentPayload.notification_url = `${webhookBaseUrl}/api/mercadopago/webhook?source=ticket&user_id=${encodeURIComponent(
+            payload.userId
+          )}&record_id=${encodeURIComponent(
+            record?.id || ''
+          )}&ticket_id=${encodeURIComponent(ticket?.id || '')}`;
         }
 
         const paymentData = await createMercadoPagoPayment(
@@ -9622,6 +10172,392 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const handleMercadoPagoWebhook = async (req: any, res: any) => {
+    try {
+      const topic = String(
+        req.query?.topic || req.query?.type || req.body?.type || req.body?.topic || ''
+      ).toLowerCase();
+      const paymentIdRaw =
+        req.query?.id || req.body?.data?.id || req.body?.id || '';
+      const paymentId = String(paymentIdRaw || '').trim();
+      const queryUserId = String(
+        req.query?.user_id || req.query?.userId || ''
+      ).trim();
+      const queryRecordId = String(
+        req.query?.record_id || req.query?.recordId || ''
+      ).trim();
+      const queryTicketId = String(
+        req.query?.ticket_id || req.query?.ticketId || ''
+      ).trim();
+
+      if (!paymentId) {
+        return res.json({ received: true });
+      }
+
+      if (topic && !topic.includes('payment')) {
+        return res.json({ received: true });
+      }
+
+      let paymentData: any = null;
+      if (queryUserId) {
+        const tokenInfo = await getMercadoPagoAccessToken(queryUserId);
+        if (!tokenInfo?.accessToken) {
+          return res.json({ received: true });
+        }
+        paymentData = await fetchMercadoPagoPayment(
+          tokenInfo.accessToken,
+          paymentId
+        );
+      } else {
+        const platformConfig = getPlatformMercadoPagoConfig();
+        if (!platformConfig.accessToken) {
+          return res.json({ received: true });
+        }
+        paymentData = await fetchMercadoPagoPayment(
+          platformConfig.accessToken,
+          paymentId
+        );
+      }
+
+      const metadata = paymentData?.metadata || {};
+      const purpose = String(metadata?.purpose || '').toLowerCase();
+      const externalReference = String(paymentData?.external_reference || '');
+      const referenceParts = externalReference.split(':');
+      const fallbackUserId = referenceParts.length >= 3 ? referenceParts[1] : '';
+      const fallbackPlanTypeId = referenceParts.length >= 3 ? referenceParts[2] : '';
+      const status = String(paymentData?.status || '').toLowerCase();
+      if (!['approved', 'accredited'].includes(status)) {
+        return res.json({ received: true });
+      }
+
+      const userId = String(metadata?.user_id || fallbackUserId || '').trim();
+      const planTypeId = String(
+        metadata?.plan_type_id || fallbackPlanTypeId || ''
+      ).trim();
+
+      if (purpose === 'plan' || externalReference.startsWith('plan:')) {
+        if (!userId || !planTypeId) {
+          console.warn('[MercadoPago] Webhook sem user/plan:', {
+            paymentId,
+            externalReference,
+            metadata,
+          });
+          return res.json({ received: true });
+        }
+
+        const user = await storage.getUser(userId);
+        const planType = await storage.getPlanType(planTypeId);
+        if (!user || !planType) {
+          return res.json({ received: true });
+        }
+
+        await ensureMercadoPagoPlanSubscription({
+          paymentId,
+          paymentStatus: status,
+          paymentMethodId: paymentData?.payment_method_id || null,
+          amount: Number(paymentData?.transaction_amount || 0),
+          monthsToAdd: Number(metadata?.months || metadata?.months_to_add || 1),
+          discountPercent: Number(
+            metadata?.discount_percent ?? metadata?.discountPercent ?? 0
+          ),
+          grossAmount: Number(
+            metadata?.gross_amount ?? metadata?.grossAmount ?? 0
+          ),
+          user,
+          planType,
+        });
+
+        return res.json({ received: true });
+      }
+
+      const ticketUserId = queryUserId || userId;
+      if (!ticketUserId) {
+        return res.json({ received: true });
+      }
+
+      let referenceId = String(
+        queryRecordId ||
+          metadata?.record_id ||
+          metadata?.reference_id ||
+          queryTicketId ||
+          metadata?.ticket_id ||
+          ''
+      ).trim();
+      if (!referenceId && externalReference && !externalReference.startsWith('plan:')) {
+        referenceId = externalReference.trim();
+      }
+
+      if (!referenceId) {
+        return res.json({ received: true });
+      }
+
+      const paidAt =
+        paymentData?.date_approved || paymentData?.date_last_updated || null;
+      const paidAtIso = paidAt ? new Date(paidAt).toISOString() : new Date().toISOString();
+
+      let updated = await markFinancialRecordPaid(
+        ticketUserId,
+        referenceId,
+        paidAtIso
+      );
+      if (!updated && queryTicketId && referenceId !== queryTicketId) {
+        updated = await markFinancialRecordPaid(
+          ticketUserId,
+          queryTicketId,
+          paidAtIso
+        );
+      }
+
+      if (!updated) {
+        console.warn('[MercadoPago] Webhook sem registro financeiro:', {
+          paymentId,
+          referenceId,
+          externalReference,
+          metadata,
+        });
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error('[MercadoPago] Erro no webhook:', error);
+      res.status(500).json({
+        message: 'Erro no webhook Mercado Pago',
+        error: error.message,
+      });
+    }
+  };
+
+  app.post('/api/mercadopago/webhook', handleMercadoPagoWebhook);
+  app.get('/api/mercadopago/webhook', handleMercadoPagoWebhook);
+
+  // Obter assinatura atual do usuario (por email)
+  app.get(
+    '/api/subscriptions/mercadopago/config',
+    isAuthenticated,
+    async (req: any, res) => {
+      const config = getPlatformMercadoPagoConfig();
+      res.json({
+        enabled: config.enabled,
+        publicKey: config.publicKey,
+      });
+    }
+  );
+
+  app.post(
+    '/api/subscriptions/mercadopago/charge',
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+
+        const { planTypeId, formData } = req.body || {};
+        if (!planTypeId) {
+          return res.status(400).json({ message: 'ID do plano e obrigatorio' });
+        }
+
+        const planType = await storage.getPlanType(planTypeId);
+        if (!planType) {
+          return res.status(404).json({ message: 'Plano nao encontrado' });
+        }
+
+        const priceValue =
+          typeof planType.price === 'string'
+            ? parseFloat(planType.price)
+            : Number(planType.price || 0);
+
+        const rawMonths = Number(
+          req.body?.months ?? req.body?.monthsToAdd ?? req.body?.renewalMonths ?? 1
+        );
+        const monthsToAdd = Number.isFinite(rawMonths)
+          ? Math.max(1, Math.min(5, Math.round(rawMonths)))
+          : 1;
+        const discountPercent = Math.min(10, monthsToAdd * 2);
+        const grossAmount = priceValue * monthsToAdd;
+        const netAmount =
+          Math.round((grossAmount * (1 - discountPercent / 100)) * 100) / 100;
+
+        if (!priceValue || priceValue <= 0) {
+          const subscription = await storage.createSubscription({
+            email: normalizeEmailAddress(user.email),
+            role: resolvePlanRoleForUser(user, planType),
+            planTypeId,
+            status: 'active',
+            paymentGateway: 'manual',
+            paymentGatewayCustomerId: null,
+            paymentGatewaySubscriptionId: null,
+            startDate: new Date(),
+            endDate: computePlanEndDateFromMonths(
+              planType,
+              new Date(),
+              monthsToAdd
+            ),
+            metadata: { source: 'manual' },
+          });
+          return res.json({ status: 'approved', subscription });
+        }
+
+        const platformConfig = getPlatformMercadoPagoConfig();
+        if (!platformConfig.accessToken) {
+          return res.status(500).json({
+            message: 'Mercado Pago plataforma nao configurado',
+          });
+        }
+
+        const paymentMethodId =
+          formData?.payment_method_id ||
+          formData?.paymentMethodId ||
+          formData?.paymentMethod ||
+          '';
+
+        if (!paymentMethodId) {
+          return res
+            .status(400)
+            .json({ message: 'Metodo de pagamento nao informado' });
+        }
+
+        const payerEmail =
+          formData?.payer?.email ||
+          formData?.payer_email ||
+          formData?.email ||
+          user.email ||
+          '';
+        if (!payerEmail) {
+          return res
+            .status(400)
+            .json({ message: 'Email do pagador obrigatorio' });
+        }
+
+        const documentNumber = normalizeDocumentValue(
+          formData?.payer?.identification?.number ||
+            formData?.identification?.number ||
+            formData?.document ||
+            user?.cpf ||
+            user?.cnpj ||
+            ''
+        );
+        const documentType =
+          documentNumber.length === 11
+            ? 'CPF'
+            : documentNumber.length === 14
+              ? 'CNPJ'
+              : null;
+        if (!documentType) {
+          return res
+            .status(400)
+            .json({ message: 'CPF ou CNPJ obrigatorio para pagamento' });
+        }
+
+        const subscriptionRole = resolvePlanRoleForUser(user, planType);
+        const description = `Assinatura ${planType.name || 'Plano'} - ${
+          monthsToAdd
+        } mes${monthsToAdd > 1 ? 'es' : ''} (${
+          discountPercent > 0 ? `${discountPercent}% off` : 'sem desconto'
+        })`;
+
+        const paymentPayload: Record<string, any> = {
+          transaction_amount: netAmount,
+          description,
+          payment_method_id: paymentMethodId,
+          external_reference: `plan:${userId}:${planTypeId}`,
+          payer: {
+            email: payerEmail,
+            identification: {
+              type: documentType,
+              number: documentNumber,
+            },
+          },
+          metadata: {
+            purpose: 'plan',
+            user_id: userId,
+            email: normalizeEmailAddress(user.email),
+            plan_type_id: planTypeId,
+            role: subscriptionRole,
+            billing_cycle: planType.billingCycle || 'monthly',
+            months: monthsToAdd,
+            discount_percent: discountPercent,
+            gross_amount: grossAmount,
+            net_amount: netAmount,
+          },
+        };
+
+        const webhookBaseUrl = (
+          process.env.BASE_URL || getRequestBaseUrl(req)
+        ).replace(/\/+$/, '');
+        if (webhookBaseUrl) {
+          paymentPayload.notification_url = `${webhookBaseUrl}/api/mercadopago/webhook`;
+        }
+
+        if (formData?.token) {
+          paymentPayload.token = formData.token;
+        }
+        if (formData?.issuer_id) {
+          paymentPayload.issuer_id = formData.issuer_id;
+        }
+        if (formData?.installments) {
+          paymentPayload.installments = Number(formData.installments);
+        }
+
+        const paymentData = await createMercadoPagoPayment(
+          platformConfig.accessToken,
+          paymentPayload
+        );
+
+        const normalizedStatus = String(paymentData?.status || '');
+        let subscription: any = null;
+        if (
+          normalizedStatus === 'approved' ||
+          normalizedStatus === 'accredited'
+        ) {
+          subscription = await ensureMercadoPagoPlanSubscription({
+            paymentId: paymentData?.id,
+            paymentStatus: normalizedStatus,
+            paymentMethodId: paymentMethodId || null,
+            amount: netAmount,
+            monthsToAdd,
+            discountPercent,
+            grossAmount,
+            user,
+            planType,
+          });
+        }
+
+        const transactionData =
+          paymentData?.point_of_interaction?.transaction_data || {};
+        const pixPayload = transactionData.qr_code || null;
+        const qrCodeBase64 = transactionData.qr_code_base64 || '';
+        const qrCodeDataUrl = qrCodeBase64
+          ? `data:image/png;base64,${qrCodeBase64}`
+          : null;
+
+        res.json({
+          status: paymentData?.status || null,
+          statusDetail: paymentData?.status_detail || null,
+          paymentId: paymentData?.id || null,
+          pixPayload,
+          qrCodeDataUrl,
+          months: monthsToAdd,
+          discountPercent,
+          grossAmount,
+          netAmount,
+          subscription,
+        });
+      } catch (error: any) {
+        console.error('[Subscriptions] Erro ao cobrar com MP:', error);
+        res.status(500).json({
+          message: error?.message || 'Falha ao processar pagamento',
+        });
+      }
+    }
+  );
+
   // Obter assinatura atual do usuario (por email)
   app.get('/api/subscriptions/current', isAuthenticated, async (req: any, res) => {
     try {
@@ -9639,8 +10575,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const subscriptions = await storage.getSubscriptionsByEmail(originalEmail);
+      const now = new Date();
       const activeSubscription = (subscriptions || [])
-        .filter((sub) => sub.status === 'active')
+        .filter((sub) => isSubscriptionActive(sub, now))
         .sort((a, b) => {
           const aDate = new Date(a.startDate || a.createdAt || 0).getTime();
           const bDate = new Date(b.startDate || b.createdAt || 0).getTime();

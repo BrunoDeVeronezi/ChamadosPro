@@ -1501,25 +1501,65 @@ export default function Dashboard() {
 
 
 
-      const response = await apiRequest(
+      try {
 
-        'POST',
+        const response = await apiRequest(
 
-        `/api/tickets/${id}/complete`,
+          'POST',
 
-        requestData
+          `/api/tickets/${id}/complete`,
 
-      );
+          requestData
 
-      if (!response.ok) {
+        );
 
-        const error = await response.json();
+        if (!response.ok) {
 
-        throw new Error(error.message || 'Erro ao finalizar atendimento');
+          const error = await response.json();
+
+          throw new Error(error.message || 'Erro ao finalizar atendimento');
+
+        }
+
+        return await response.json();
+
+      } catch (error: any) {
+
+        const message = typeof error?.message === 'string' ? error.message : '';
+
+        if (message.toLowerCase().includes('warranty')) {
+
+          const { warranty, ...payloadWithoutWarranty } = requestData;
+
+          const retryResponse = await apiRequest(
+
+            'POST',
+
+            `/api/tickets/${id}/complete`,
+
+            payloadWithoutWarranty
+
+          );
+
+          if (!retryResponse.ok) {
+
+            const retryError = await retryResponse.json();
+
+            throw new Error(
+
+              retryError.message || 'Erro ao finalizar atendimento'
+
+            );
+
+          }
+
+          return await retryResponse.json();
+
+        }
+
+        throw error;
 
       }
-
-      return await response.json();
 
     },
 

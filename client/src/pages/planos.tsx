@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
@@ -18,6 +18,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import {
   Table,
@@ -60,6 +62,12 @@ interface Subscription {
   hasSubscription?: boolean;
 }
 
+declare global {
+  interface Window {
+    MercadoPago?: any;
+  }
+}
+
 const planHighlights = [
   'Usuarios ilimitados e plano completo',
   'Gestao de chamados e agenda integrada',
@@ -91,6 +99,20 @@ const itemVariants = {
   },
 };
 
+const loadMercadoPagoSdk = () =>
+  new Promise<void>((resolve, reject) => {
+    if (window.MercadoPago) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://sdk.mercadopago.com/js/v2';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Falha ao carregar o Mercado Pago'));
+    document.body.appendChild(script);
+  });
+
 const formatDateLabel = (value?: string | null) => {
   if (!value) return null;
   const date = new Date(value);
@@ -120,6 +142,17 @@ export default function Planos() {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const mpSectionRef = useRef<HTMLDivElement | null>(null);
+  const mpBrickRef = useRef<any>(null);
+  const payerEmailRef = useRef('');
+  const payerDocumentRef = useRef('');
+  const [mpSdkReady, setMpSdkReady] = useState(false);
+  const [mpError, setMpError] = useState<string | null>(null);
+  const [mpSubmitting, setMpSubmitting] = useState(false);
+  const [mpPaymentResult, setMpPaymentResult] = useState<any>(null);
+  const [payerEmail, setPayerEmail] = useState('');
+  const [payerDocument, setPayerDocument] = useState('');
+  const [renewalMonths, setRenewalMonths] = useState(1);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -150,6 +183,25 @@ export default function Planos() {
     navigate(nextPath, { replace: true });
   }, [location, navigate, toast]);
 
+  useEffect(() => {
+    if (!payerEmail && user?.email) {
+      setPayerEmail(user.email);
+    }
+    if (!payerDocument) {
+      const doc = user?.cpf || user?.cnpj || '';
+      if (doc) setPayerDocument(doc);
+    }
+  }, [payerEmail, payerDocument, user?.email, user?.cpf, user?.cnpj]);
+
+  useEffect(() => {
+    payerEmailRef.current = payerEmail;
+  }, [payerEmail]);
+
+  useEffect(() => {
+    payerDocumentRef.current = payerDocument;
+  }, [payerDocument]);
+
+
   const { data: plans, isLoading: plansLoading } = useQuery<PlanType[]>({
     queryKey: ['/api/plans'],
     queryFn: async () => {
@@ -177,6 +229,25 @@ export default function Planos() {
         return response.json();
       },
     });
+
+  const { data: mercadoPagoConfig } = useQuery<{
+    enabled: boolean;
+    publicKey?: string | null;
+  }>({
+    queryKey: ['/api/subscriptions/mercadopago/config'],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'GET',
+        '/api/subscriptions/mercadopago/config',
+        undefined
+      );
+      if (!response.ok) {
+        throw new Error('Erro ao carregar Mercado Pago');
+      }
+      return response.json();
+    },
+    retry: false,
+  });
 
   const subscribeMutation = useMutation({
     mutationFn: async (planTypeId: string) => {
@@ -243,6 +314,200 @@ export default function Planos() {
     },
   });
 
+  const paidPlan = plans?.[0] ?? null;
+  const isSubscriptionActive = currentSubscription?.status === 'active';
+  const isUserPlanActive = user?.planStatus === 'active';
+  const mpPaymentEnabled = Boolean(
+    mercadoPagoConfig?.enabled && mercadoPagoConfig?.publicKey
+  );
+  const showMpPayment = mpPaymentEnabled && !!paidPlan;
+  const normalizedMonths = Math.min(5, Math.max(1, Math.round(renewalMonths)));
+  const unitPriceValue = paidPlan ? Number(paidPlan.price || 0) : 0;
+  const grossAmount = unitPriceValue * normalizedMonths;
+  const discountPercent = Math.min(10, normalizedMonths * 2);
+  const discountAmount = grossAmount * (discountPercent / 100);
+  const netAmount = Math.max(0, grossAmount - discountAmount);
+  const netAmountRounded = Math.round(netAmount * 100) / 100;
+
+  useEffect(() => {
+    setMpPaymentResult(null);
+    setMpError(null);
+  }, [normalizedMonths]);
+
+  useEffect(() => {
+    if (!mpPaymentEnabled || !mercadoPagoConfig?.publicKey) return;
+    loadMercadoPagoSdk()
+      .then(() => setMpSdkReady(true))
+      .catch((error) => {
+        console.error(error);
+        setMpError('Nao foi possivel carregar o Mercado Pago.');
+      });
+  }, [mercadoPagoConfig?.publicKey, mpPaymentEnabled]);
+
+  useEffect(() => {
+    if (!mpSdkReady || !showMpPayment || !paidPlan) return;
+    const amount = netAmountRounded;
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    let isCancelled = false;
+
+    const initBrick = async () => {
+      if (mpBrickRef.current?.unmount) {
+        await mpBrickRef.current.unmount();
+      }
+      setMpError(null);
+      const mp = new window.MercadoPago(mercadoPagoConfig?.publicKey, {
+        locale: 'pt-BR',
+      });
+      const bricksBuilder = mp.bricks();
+      try {
+        const controller = await bricksBuilder.create(
+          'payment',
+          'mp_plan_payment_brick',
+          {
+            initialization: {
+              amount,
+              payer: payerEmailRef.current
+                ? { email: payerEmailRef.current }
+                : undefined,
+            },
+            customization: {
+              visual: {
+                style: {
+                  theme: 'default',
+                },
+              },
+              paymentMethods: {
+                creditCard: 'all',
+                debitCard: 'all',
+                bankTransfer: ['pix'],
+              },
+            },
+            callbacks: {
+              onReady: () => {},
+              onSubmit: ({ formData }: { formData: any }) => {
+                const currentEmail = payerEmailRef.current.trim();
+                const currentDocument = payerDocumentRef.current.trim();
+                if (!currentEmail || !currentDocument) {
+                  setMpError('Informe email e CPF/CNPJ para continuar.');
+                  return Promise.reject();
+                }
+                setMpSubmitting(true);
+                setMpError(null);
+                const normalizedDocument = currentDocument.replace(/\D/g, '');
+                const normalizedFormData = {
+                  ...(formData || {}),
+                  email: currentEmail,
+                  document: normalizedDocument,
+                };
+                return apiRequest(
+                  'POST',
+                  '/api/subscriptions/mercadopago/charge',
+                  {
+                    planTypeId: paidPlan.id,
+                    months: normalizedMonths,
+                    formData: normalizedFormData,
+                  }
+                )
+                  .then((response) => response.json())
+                  .then((responseData) => {
+                    if (isCancelled) return;
+                    setMpPaymentResult(responseData);
+                    if (
+                      responseData?.status === 'approved' ||
+                      responseData?.status === 'accredited'
+                    ) {
+                      toast({
+                        title: 'Pagamento aprovado',
+                        description: 'Assinatura confirmada.',
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: ['/api/subscriptions/current'],
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: ['/api/subscriptions'],
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: ['/api/auth/user'],
+                      });
+                    }
+                    return responseData;
+                  })
+                  .catch((error: any) => {
+                    if (isCancelled) return;
+                    setMpError(
+                      error?.message || 'Nao foi possivel processar o pagamento.'
+                    );
+                    return Promise.reject(error);
+                  })
+                  .finally(() => {
+                    if (!isCancelled) setMpSubmitting(false);
+                  });
+              },
+              onError: (error: any) => {
+                console.error('[Payment Brick] Error:', error);
+                setMpError(
+                  'Nao foi possivel carregar o formulario de pagamento.'
+                );
+              },
+            },
+          }
+        );
+
+        if (isCancelled) {
+          await controller.unmount();
+          return;
+        }
+        mpBrickRef.current = controller;
+      } catch (error) {
+        console.error(error);
+        setMpError('Nao foi possivel inicializar o pagamento. Tente novamente.');
+      }
+    };
+
+    initBrick();
+
+    return () => {
+      isCancelled = true;
+      if (mpBrickRef.current?.unmount) {
+        mpBrickRef.current.unmount();
+      }
+    };
+  }, [
+    mpSdkReady,
+    showMpPayment,
+    paidPlan,
+    normalizedMonths,
+    netAmountRounded,
+    mercadoPagoConfig?.publicKey,
+    toast,
+  ]);
+
+  useEffect(() => {
+    const status = String(mpPaymentResult?.status || '').toLowerCase();
+    if (!mpPaymentResult?.paymentId) return;
+    if (!['pending', 'in_process'].includes(status)) return;
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({
+        queryKey: ['/api/subscriptions/current'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [mpPaymentResult?.paymentId, mpPaymentResult?.status]);
+
+  useEffect(() => {
+    if (!mpPaymentResult?.paymentId) return;
+    if (!isSubscriptionActive) return;
+    toast({
+      title: 'Pagamento confirmado',
+      description: 'Acesso liberado para o sistema.',
+    });
+    setMpPaymentResult(null);
+    setSelectedPlan(null);
+  }, [isSubscriptionActive, mpPaymentResult?.paymentId, toast]);
+
   if (plansLoading || subscriptionLoading) {
     return (
       <div className='flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0b1120]'>
@@ -250,8 +515,6 @@ export default function Planos() {
       </div>
     );
   }
-
-  const paidPlan = plans?.[0] ?? null;
   const planName = paidPlan?.name?.trim() || 'Plano Tecnico';
 
   const planStatus = user?.planStatus;
@@ -261,7 +524,6 @@ export default function Planos() {
   const trialDaysLeft =
     typeof user?.trialDaysLeft === 'number' ? user.trialDaysLeft : null;
   const trialEndsLabel = formatDateLabel(user?.trialEndsAt);
-  const isSubscriptionActive = currentSubscription?.status === 'active';
   const computedTrialDaysLeft =
     typeof trialDaysLeft === 'number'
       ? trialDaysLeft
@@ -294,7 +556,9 @@ export default function Planos() {
   const nextBillingLabel =
     (isTrial ? trialEndsLabel : formatDateLabel(currentSubscription?.endDate)) ||
     'A definir';
-  const monthlyPriceLabel = formatPrice('35');
+  const monthlyPriceLabel = formatPrice(
+    String(paidPlan?.price ?? unitPriceValue ?? 0)
+  );
   const billingCycleValue = paidPlan?.billingCycle?.toLowerCase();
   const billingCycleLabel = billingCycleValue?.includes('year')
     ? 'Anual'
@@ -334,11 +598,15 @@ export default function Planos() {
   const paymentMethodTitle =
     currentSubscription?.paymentGateway === 'stripe'
       ? 'Pagamento via Stripe'
-      : 'Nenhum metodo cadastrado';
+      : currentSubscription?.paymentGateway === 'mercadopago'
+        ? 'Pagamento via Mercado Pago'
+        : 'Nenhum metodo cadastrado';
   const paymentMethodSubtitle =
     currentSubscription?.paymentGateway === 'stripe'
       ? 'Atualize cartao ou dados de cobranca no portal.'
-      : 'Adicione um metodo para manter a assinatura ativa.';
+      : currentSubscription?.paymentGateway === 'mercadopago'
+        ? 'Renove sua assinatura via Mercado Pago.'
+        : 'Adicione um metodo para manter a assinatura ativa.';
   const billingStatusLabel: Record<string, string> = {
     active: 'Pago',
     pending: 'Pendente',
@@ -359,6 +627,10 @@ export default function Planos() {
         title: 'Plano indisponivel',
         description: 'Nenhum plano ativo foi encontrado.',
       });
+      return;
+    }
+    if (mpPaymentEnabled) {
+      mpSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     setSelectedPlan(paidPlan.id);
@@ -566,20 +838,28 @@ export default function Planos() {
                   className='w-full gap-2 bg-[color:var(--plan-primary)] text-white hover:bg-blue-700'
                   onClick={handleSubscribe}
                   disabled={
-                    isSubscriptionActive ||
                     !paidPlan ||
                     subscribeMutation.isPending ||
-                    selectedPlan === paidPlan?.id
+                    selectedPlan === paidPlan?.id ||
+                    (!mpPaymentEnabled && isSubscriptionActive)
                   }
                 >
                   {subscribeMutation.isPending &&
-                  selectedPlan === paidPlan?.id ? (
+                  selectedPlan === paidPlan?.id &&
+                  !mpPaymentEnabled ? (
                     <>
                       <Loader2 className='h-4 w-4 animate-spin' />
                       Assinando...
                     </>
-                  ) : isSubscriptionActive ? (
+                  ) : isSubscriptionActive && !mpPaymentEnabled ? (
                     'Seu plano atual'
+                  ) : mpPaymentEnabled ? (
+                    <>
+                      {isSubscriptionActive || isActive
+                        ? 'Renovar agora'
+                        : 'Pagar com Mercado Pago'}
+                      <ArrowRight className='h-4 w-4' />
+                    </>
                   ) : (
                     <>
                       Assinar agora
@@ -590,6 +870,166 @@ export default function Planos() {
               </CardContent>
             </Card>
           </motion.div>
+
+          {showMpPayment && (
+            <motion.div
+              variants={itemVariants}
+              ref={mpSectionRef}
+              className='scroll-mt-24 space-y-4'
+            >
+              <Card className='border border-slate-200/70 bg-white/90 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/50'>
+                <CardContent className='space-y-4 p-6'>
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <div className='flex items-center gap-3'>
+                    <div className='flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-200'>
+                      MP
+                    </div>
+                    <div>
+                      <p className='text-base font-semibold'>
+                        Renovar com Mercado Pago
+                      </p>
+                      <p className='text-xs text-slate-500 dark:text-slate-300'>
+                        Pague via PIX, debito ou cartao de credito.
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className='bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'>
+                    PIX instantaneo
+                  </Badge>
+                </div>
+
+                <div className='rounded-xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40'>
+                  <p className='text-sm font-semibold text-slate-700 dark:text-slate-200'>
+                    Escolha quantos meses deseja renovar
+                  </p>
+                  <div className='mt-3 flex flex-wrap gap-2'>
+                    {[1, 2, 3, 4, 5].map((months) => {
+                      const isSelected = normalizedMonths === months;
+                      return (
+                        <Button
+                          key={months}
+                          type='button'
+                          size='sm'
+                          variant={isSelected ? 'default' : 'outline'}
+                          className={
+                            isSelected
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'border-slate-300 text-slate-600 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200'
+                          }
+                          onClick={() => setRenewalMonths(months)}
+                        >
+                          {months} mes{months > 1 ? 'es' : ''}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className='mt-4 grid gap-3 text-sm sm:grid-cols-3'>
+                    <div>
+                      <p className='text-xs uppercase text-slate-500 dark:text-slate-400'>
+                        Valor mensal
+                      </p>
+                      <p className='font-semibold'>
+                        {formatPrice(String(unitPriceValue || 0))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className='text-xs uppercase text-slate-500 dark:text-slate-400'>
+                        Desconto
+                      </p>
+                      <p className='font-semibold text-emerald-600'>
+                        {discountPercent}% OFF
+                      </p>
+                      <p className='text-[11px] text-slate-400'>
+                        Maximo de 10%
+                      </p>
+                    </div>
+                    <div>
+                      <p className='text-xs uppercase text-slate-500 dark:text-slate-400'>
+                        Total
+                      </p>
+                      <p className='font-semibold'>
+                        {formatPrice(String(netAmountRounded || 0))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='grid gap-4 md:grid-cols-2'>
+                  <div className='space-y-2'>
+                    <Label htmlFor='mp-payer-email'>Email do pagador</Label>
+                      <Input
+                        id='mp-payer-email'
+                        value={payerEmail}
+                        onChange={(event) => setPayerEmail(event.target.value)}
+                        placeholder='email@empresa.com'
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label htmlFor='mp-payer-document'>CPF ou CNPJ</Label>
+                      <Input
+                        id='mp-payer-document'
+                        value={payerDocument}
+                        onChange={(event) =>
+                          setPayerDocument(event.target.value)
+                        }
+                        placeholder='Somente numeros'
+                      />
+                    </div>
+                  </div>
+
+                  {mpError && (
+                    <div className='rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
+                      {mpError}
+                    </div>
+                  )}
+
+                  {mpSubmitting && (
+                    <div className='flex items-center gap-2 text-sm text-slate-500'>
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                      Processando pagamento...
+                    </div>
+                  )}
+
+                  <div id='mp_plan_payment_brick' />
+
+                  {mpPaymentResult?.status && (
+                    <div className='rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800/60 dark:bg-slate-900/40 dark:text-slate-300'>
+                      Status: {mpPaymentResult.status}
+                      {mpPaymentResult.statusDetail
+                        ? ` (${mpPaymentResult.statusDetail})`
+                        : ''}
+                    </div>
+                  )}
+
+                  {mpPaymentResult?.qrCodeDataUrl && (
+                    <div className='rounded-lg border border-slate-200 p-4 text-center'>
+                      <p className='text-sm font-medium text-slate-700'>
+                        QR Code PIX
+                      </p>
+                      <img
+                        src={mpPaymentResult.qrCodeDataUrl}
+                        alt='QR Code PIX'
+                        className='mx-auto mt-3 h-48 w-48'
+                      />
+                      {mpPaymentResult.pixPayload && (
+                        <Button
+                          className='mt-3'
+                          variant='outline'
+                          onClick={() =>
+                            navigator.clipboard.writeText(
+                              mpPaymentResult.pixPayload || ''
+                            )
+                          }
+                        >
+                          Copiar codigo PIX
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           <motion.div
             variants={itemVariants}

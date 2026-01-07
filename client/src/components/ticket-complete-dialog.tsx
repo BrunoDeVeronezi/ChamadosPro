@@ -390,6 +390,9 @@ export function TicketCompleteDialog({
     baseAmount + extraHoursValue + kmValue + extraExpensesNum;
   const totalWithDiscount = Math.max(0, calculatedTotal - discountNum);
   const totalOverrideNum = parseFloat(unmaskCurrency(totalOverrideValue));
+  const totalOverrideDisplay = isTotalManuallyEdited
+    ? totalOverrideValue
+    : maskCurrency(numberToCurrencyString(totalWithDiscount));
   const totalAmount =
     isTotalManuallyEdited &&
     totalOverrideValue.trim() !== '' &&
@@ -943,7 +946,7 @@ export function TicketCompleteDialog({
                       </label>
                       <Input
                         type='text'
-                        value={totalOverrideValue}
+                        value={totalOverrideDisplay}
                         onChange={(e) => {
                           setTotalOverrideValue(maskCurrency(e.target.value));
                           setIsTotalManuallyEdited(true);
@@ -956,7 +959,14 @@ export function TicketCompleteDialog({
                         type='button'
                         variant='outline'
                         size='sm'
-                        onClick={() => setIsTotalManuallyEdited(false)}
+                        onClick={() => {
+                          setIsTotalManuallyEdited(false);
+                          setTotalOverrideValue(
+                            maskCurrency(
+                              numberToCurrencyString(totalWithDiscount)
+                            )
+                          );
+                        }}
                       >
                         Usar calculado
                       </Button>

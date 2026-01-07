@@ -402,6 +402,12 @@ export const integrationSettings = pgTable('integration_settings', {
   pixKey: text('pix_key'),
   pixKeyType: text('pix_key_type'),
   pixAccountHolder: text('pix_account_holder'),
+  whatsappStatus: text('whatsapp_status').default('not_connected'),
+  whatsappAccessToken: text('whatsapp_access_token'),
+  whatsappTokenExpiresAt: timestamp('whatsapp_token_expires_at'),
+  whatsappBusinessAccountId: text('whatsapp_business_account_id'),
+  whatsappPhoneNumberId: text('whatsapp_phone_number_id'),
+  whatsappPhoneNumber: text('whatsapp_phone_number'),
   // Push Notifications Configuration
   pushNotificationsConfig: jsonb('push_notifications_config'), // JSON com configurações de notificações push
   // Ticket Calculations Configuration

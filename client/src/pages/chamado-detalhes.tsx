@@ -152,21 +152,41 @@ export default function ChamadoDetalhes() {
   };
 
   const handleComplete = async (data: any) => {
+    const completionPayload = {
+      kmTotal: data.kmTotal,
+      extraExpenses: data.extraExpenses,
+      expenseDetails: data.expenseDetails,
+      baseAmount: data.baseAmount,
+      totalAmount: data.totalAmount,
+      discount: data.discount,
+      kmChargeExempt: data.kmChargeExempt,
+      serviceItems: data.serviceItems,
+      paymentDate: data.paymentDate,
+      additionalHourRate: data.additionalHourRate,
+      kmRate: data.kmRate,
+      warranty: data.warranty,
+    };
+
     try {
-      await apiRequest('POST', `/api/tickets/${ticketId}/complete`, {
-        kmTotal: data.kmTotal,
-        extraExpenses: data.extraExpenses,
-        expenseDetails: data.expenseDetails,
-        baseAmount: data.baseAmount,
-        totalAmount: data.totalAmount,
-        discount: data.discount,
-        kmChargeExempt: data.kmChargeExempt,
-        serviceItems: data.serviceItems,
-        paymentDate: data.paymentDate,
-        additionalHourRate: data.additionalHourRate,
-        kmRate: data.kmRate,
-        warranty: data.warranty,
-      });
+      try {
+        await apiRequest(
+          'POST',
+          `/api/tickets/${ticketId}/complete`,
+          completionPayload
+        );
+      } catch (error: any) {
+        const message = typeof error?.message === 'string' ? error.message : '';
+        if (message.toLowerCase().includes('warranty')) {
+          const { warranty, ...payloadWithoutWarranty } = completionPayload;
+          await apiRequest(
+            'POST',
+            `/api/tickets/${ticketId}/complete`,
+            payloadWithoutWarranty
+          );
+        } else {
+          throw error;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/tickets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tickets', ticketId] });
 

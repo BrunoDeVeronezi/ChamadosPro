@@ -135,21 +135,41 @@ export default function DetalhesChamadoExecucao2() {
   };
 
   const handleComplete = async (data: any) => {
+    const completionPayload = {
+      kmTotal: data.kmTotal,
+      kmRate: data.kmRate,
+      additionalHourRate: data.additionalHourRate,
+      extraExpenses: data.extraExpenses,
+      expenseDetails: data.expenseDetails,
+      baseAmount: data.baseAmount,
+      totalAmount: data.totalAmount,
+      discount: data.discount,
+      serviceItems: data.serviceItems,
+      paymentDate: data.paymentDate,
+      warranty: data.warranty,
+    };
+
     try {
       setIsCompleting(true);
-      await apiRequest('POST', `/api/tickets/${ticketId}/complete`, {
-        kmTotal: data.kmTotal,
-        kmRate: data.kmRate,
-        additionalHourRate: data.additionalHourRate,
-        extraExpenses: data.extraExpenses,
-        expenseDetails: data.expenseDetails,
-        baseAmount: data.baseAmount,
-        totalAmount: data.totalAmount,
-        discount: data.discount,
-        serviceItems: data.serviceItems,
-        paymentDate: data.paymentDate,
-        warranty: data.warranty,
-      });
+      try {
+        await apiRequest(
+          'POST',
+          `/api/tickets/${ticketId}/complete`,
+          completionPayload
+        );
+      } catch (error: any) {
+        const message = typeof error?.message === 'string' ? error.message : '';
+        if (message.toLowerCase().includes('warranty')) {
+          const { warranty, ...payloadWithoutWarranty } = completionPayload;
+          await apiRequest(
+            'POST',
+            `/api/tickets/${ticketId}/complete`,
+            payloadWithoutWarranty
+          );
+        } else {
+          throw error;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/tickets'] });
       setShowCompleteDialog(false);
       setLocation('/chamados');

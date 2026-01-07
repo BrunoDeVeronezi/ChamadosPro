@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { DollarSign, CheckCircle2, MessageCircle, Mail, Loader2, Search, Calendar, FileText } from 'lucide-react';
+import { DollarSign, CheckCircle2, MessageCircle, Mail, Loader2, Search, Calendar, FileText, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePaidAccess } from '@/hooks/use-paid-access';
 import { useAuth } from '@/hooks/use-auth';
@@ -74,6 +74,25 @@ interface MercadoPagoStatus {
   tokenExpiresAt?: string | null;
 }
 
+interface WhatsAppStatus {
+  configured: boolean;
+  connected: boolean;
+  status: string;
+  phoneNumberId?: string | null;
+  phoneNumber?: string | null;
+  businessAccountId?: string | null;
+  tokenExpiresAt?: string | null;
+}
+
+interface WhatsAppConfig {
+  configured: boolean;
+  appId?: string | null;
+  configId?: string | null;
+  redirectUri?: string | null;
+  scope?: string | null;
+  graphVersion?: string | null;
+}
+
 type KycFormState = {
   firstName: string;
   lastName: string;
@@ -89,6 +108,65 @@ type KycFormState = {
   neighborhood: string;
   city: string;
   state: string;
+};
+
+type FacebookLoginResponse = {
+  status?: string;
+  authResponse?: {
+    code?: string;
+  };
+};
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (options: Record<string, any>) => void;
+      login: (
+        callback: (response: FacebookLoginResponse) => void,
+        options: Record<string, any>
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
+
+let facebookSdkPromise: Promise<void> | null = null;
+
+const loadFacebookSdk = (appId: string, version: string) => {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('SDK nao disponivel.'));
+  }
+  if (window.FB) {
+    return Promise.resolve();
+  }
+  if (facebookSdkPromise) {
+    return facebookSdkPromise;
+  }
+
+  facebookSdkPromise = new Promise((resolve, reject) => {
+    window.fbAsyncInit = () => {
+      if (!window.FB) {
+        reject(new Error('SDK nao inicializado.'));
+        return;
+      }
+      window.FB.init({
+        appId,
+        cookie: true,
+        xfbml: false,
+        version,
+      });
+      resolve();
+    };
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.defer = true;
+    script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+    script.onerror = () => reject(new Error('Falha ao carregar o SDK.'));
+    document.body.appendChild(script);
+  });
+
+  return facebookSdkPromise;
 };
 
 const parseDateInput = (
@@ -138,6 +216,11 @@ function PaymentActionButtons({
   >(null);
   const [receiptShareMessage, setReceiptShareMessage] = useState('');
   const [receiptWhatsAppPhone, setReceiptWhatsAppPhone] = useState('');
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [chargeChannel, setChargeChannel] = useState<'whatsapp' | 'email'>(
+    'whatsapp'
+  );
+  const [chargeContact, setChargeContact] = useState('');
   const containerClassName =
     layout === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap gap-2';
   const buttonLayoutClassName =
@@ -300,6 +383,7 @@ function PaymentActionButtons({
         }).format(amount)} recebido com sucesso.`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/financial-records'] });
+      setReceiveDialogOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -311,11 +395,23 @@ function PaymentActionButtons({
   });
 
   const sendWhatsAppMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({
+      phone,
+      message,
+      provider,
+    }: {
+      phone?: string;
+      message?: string;
+      provider?: string;
+    }) => {
       const response = await apiRequest(
         'POST',
         `/api/tickets/${effectiveTicketId}/send-payment-link`,
-        { phone: '', message: '' }
+        {
+          phone: phone || '',
+          message: message || undefined,
+          provider: provider || 'mercadopago',
+        }
       );
       if (!response.ok) {
         const error = await response.json();
@@ -357,6 +453,7 @@ function PaymentActionButtons({
           description: 'Nao foi possivel gerar o link do WhatsApp.',
         });
       }
+      setReceiveDialogOpen(false);
     },
     onError: (error: any) => {
       const errorMessage =
@@ -378,11 +475,23 @@ function PaymentActionButtons({
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({
+      email,
+      message,
+      provider,
+    }: {
+      email: string;
+      message?: string;
+      provider?: string;
+    }) => {
       const response = await apiRequest(
         'POST',
         `/api/tickets/${effectiveTicketId}/send-payment-link-email`,
-        { email: '', message: '' }
+        {
+          email,
+          message: message || undefined,
+          provider: provider || 'mercadopago',
+        }
       );
       if (!response.ok) {
         const error = await response.json();
@@ -393,8 +502,9 @@ function PaymentActionButtons({
     onSuccess: () => {
       toast({
         title: 'Email enviado',
-        description: 'A mensagem com PIX foi enviada por email com sucesso.',
+        description: 'A cobranca foi enviada por email com sucesso.',
       });
+      setReceiveDialogOpen(false);
     },
     onError: (error: any) => {
       const errorMessage =
@@ -415,7 +525,51 @@ function PaymentActionButtons({
     },
   });
 
-  const ensureWhatsAppAccess = () => {
+  const copyPaymentLinkMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        `/api/tickets/${effectiveTicketId}/send-payment-link`,
+        {
+          provider: 'mercadopago',
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erro ao gerar link de pagamento');
+      }
+      return response.json();
+    },
+    onSuccess: async (data: any) => {
+      const paymentUrl = data?.paymentUrl || '';
+      if (!paymentUrl) {
+        toast({
+          variant: 'destructive',
+          title: 'Link indisponivel',
+          description: 'Nao foi possivel gerar o link de pagamento.',
+        });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(paymentUrl);
+        toast({
+          title: 'Link copiado',
+          description: 'Cole o link onde desejar.',
+        });
+      } else {
+        window.prompt('Copie o link de pagamento:', paymentUrl);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao copiar link',
+        description: error.message || 'Nao foi possivel gerar o link.',
+      });
+    },
+  });
+
+  const ensureWhatsAppAccess = (provider: 'mercadopago' | 'pix' = 'pix') => {
     if (
       !requirePaid({
         feature: 'Envio por WhatsApp',
@@ -425,7 +579,7 @@ function PaymentActionButtons({
     ) {
       return false;
     }
-    if (!hasPixKey) {
+    if (provider === 'pix' && !hasPixKey) {
       toast({
         variant: 'destructive',
         title: 'Chave PIX nao configurada',
@@ -436,15 +590,26 @@ function PaymentActionButtons({
     return true;
   };
 
+  useEffect(() => {
+    if (!receiveDialogOpen) {
+      setChargeChannel('whatsapp');
+      setChargeContact('');
+    }
+  }, [receiveDialogOpen]);
+
   const handleWhatsAppText = () => {
-    if (!ensureWhatsAppAccess()) {
+    if (!ensureWhatsAppAccess('mercadopago')) {
       return;
     }
-    sendWhatsAppMutation.mutate();
+    sendWhatsAppMutation.mutate({
+      phone: '',
+      message: undefined,
+      provider: 'mercadopago',
+    });
   };
 
   const handleWhatsAppImage = () => {
-    if (!ensureWhatsAppAccess()) {
+    if (!ensureWhatsAppAccess('pix')) {
       return;
     }
     handleEmitReceipt('whatsapp');
@@ -455,7 +620,7 @@ function PaymentActionButtons({
       <Button
         size='sm'
         variant='outline'
-        onClick={() => receivePaymentMutation.mutate()}
+        onClick={() => setReceiveDialogOpen(true)}
         disabled={receivePaymentMutation.isPending}
         className={`flex items-center gap-2${buttonLayoutClassName ? ` ${buttonLayoutClassName}` : ''}`}
       >
@@ -506,15 +671,8 @@ function PaymentActionButtons({
         size='sm'
         variant='outline'
         onClick={() => {
-          if (!hasPixKey) {
-            toast({
-              variant: 'destructive',
-              title: 'Chave PIX nao configurada',
-              description: 'Cadastre a chave PIX acima antes de enviar.',
-            });
-            return;
-          }
-          sendEmailMutation.mutate();
+          setChargeChannel('email');
+          setReceiveDialogOpen(true);
         }}
         disabled={sendEmailMutation.isPending}
         className={`flex items-center gap-2${buttonLayoutClassName ? ` ${buttonLayoutClassName}` : ''}`}
@@ -526,6 +684,164 @@ function PaymentActionButtons({
         )}
         Email
       </Button>
+
+      <Dialog open={receiveDialogOpen} onOpenChange={setReceiveDialogOpen}>
+        <DialogContent className='max-w-lg bg-white dark:bg-[#101722] border-gray-200 dark:border-slate-800'>
+          <DialogHeader>
+            <DialogTitle className='text-lg font-semibold'>
+              Receber pagamento
+            </DialogTitle>
+            <DialogDescription className='text-sm text-[#60708a] dark:text-slate-400'>
+              Escolha se deseja registrar o pagamento manualmente ou enviar a
+              cobranca pelo Mercado Pago.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className='space-y-4'>
+            <div className='rounded-xl border border-slate-200/70 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40'>
+              <div className='flex items-center justify-between gap-3'>
+                <div>
+                  <p className='text-sm font-semibold text-slate-700 dark:text-slate-200'>
+                    Pagamento manual
+                  </p>
+                  <p className='text-xs text-slate-500 dark:text-slate-400'>
+                    Registre como pago em dinheiro ou outro metodo.
+                  </p>
+                </div>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => receivePaymentMutation.mutate()}
+                  disabled={receivePaymentMutation.isPending}
+                >
+                  {receivePaymentMutation.isPending ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    'Registrar pagamento'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className='rounded-xl border border-slate-200/70 bg-white p-4 dark:border-slate-800/60 dark:bg-slate-950/40'>
+              <div className='flex items-center justify-between gap-3'>
+                <div>
+                  <p className='text-sm font-semibold text-slate-700 dark:text-slate-200'>
+                    Enviar cobranca Mercado Pago
+                  </p>
+                  <p className='text-xs text-slate-500 dark:text-slate-400'>
+                    O cliente escolhe PIX ou cartao no link de pagamento.
+                  </p>
+                </div>
+                <Badge className='bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200'>
+                  Pix/cartao
+                </Badge>
+              </div>
+
+              <div className='mt-3 flex flex-wrap gap-2'>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant={chargeChannel === 'whatsapp' ? 'default' : 'outline'}
+                  onClick={() => setChargeChannel('whatsapp')}
+                >
+                  WhatsApp
+                </Button>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant={chargeChannel === 'email' ? 'default' : 'outline'}
+                  onClick={() => setChargeChannel('email')}
+                >
+                  Email
+                </Button>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={() => copyPaymentLinkMutation.mutate()}
+                  disabled={copyPaymentLinkMutation.isPending}
+                  className='gap-2'
+                >
+                  {copyPaymentLinkMutation.isPending ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <Copy className='h-4 w-4' />
+                  )}
+                  Copiar link
+                </Button>
+              </div>
+
+              <div className='mt-3 space-y-2'>
+                <Label htmlFor='charge-contact'>
+                  {chargeChannel === 'email'
+                    ? 'Email do cliente'
+                    : 'Telefone do cliente (opcional)'}
+                </Label>
+                <Input
+                  id='charge-contact'
+                  type={chargeChannel === 'email' ? 'email' : 'tel'}
+                  value={chargeContact}
+                  onChange={(event) => setChargeContact(event.target.value)}
+                  placeholder={
+                    chargeChannel === 'email'
+                      ? 'cliente@empresa.com'
+                      : '(00) 00000-0000'
+                  }
+                />
+                <p className='text-xs text-slate-500 dark:text-slate-400'>
+                  {chargeChannel === 'email'
+                    ? 'Informe o email para envio automatico.'
+                    : 'Se deixar em branco, voce escolhe o contato no WhatsApp.'}
+                </p>
+              </div>
+
+              <div className='mt-4 flex justify-end'>
+                <Button
+                  type='button'
+                  size='sm'
+                  onClick={() => {
+                    if (chargeChannel === 'email') {
+                      if (!chargeContact || !chargeContact.includes('@')) {
+                        toast({
+                          variant: 'destructive',
+                          title: 'Email invalido',
+                          description: 'Informe um email valido para enviar.',
+                        });
+                        return;
+                      }
+                      sendEmailMutation.mutate({
+                        email: chargeContact,
+                        provider: 'mercadopago',
+                      });
+                    } else {
+                      sendWhatsAppMutation.mutate({
+                        phone: chargeContact.replace(/\D/g, ''),
+                        provider: 'mercadopago',
+                      });
+                    }
+                  }}
+                  disabled={
+                    sendWhatsAppMutation.isPending || sendEmailMutation.isPending
+                  }
+                  className='bg-blue-600 text-white hover:bg-blue-700'
+                >
+                  {sendWhatsAppMutation.isPending ||
+                  sendEmailMutation.isPending ? (
+                    <>
+                      <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar cobranca'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {receiptData && (
         <ReceiptPreviewDialog
@@ -569,6 +885,7 @@ export default function DashboardFinanceiro() {
   const [isKycDialogOpen, setIsKycDialogOpen] = useState(false);
   const [pendingMpConnect, setPendingMpConnect] = useState(false);
   const [isConnectingMp, setIsConnectingMp] = useState(false);
+  const [isConnectingWhatsApp, setIsConnectingWhatsApp] = useState(false);
   const [isSubmittingKyc, setIsSubmittingKyc] = useState(false);
   const [isFetchingCep, setIsFetchingCep] = useState(false);
   const [kycErrors, setKycErrors] = useState<Record<string, string>>({});
@@ -596,6 +913,11 @@ export default function DashboardFinanceiro() {
   const { data: mercadoPagoStatus, isLoading: isLoadingMpStatus } =
     useQuery<MercadoPagoStatus>({
       queryKey: ['/api/mercadopago/status'],
+    });
+
+  const { data: whatsappStatus, isLoading: isLoadingWhatsAppStatus } =
+    useQuery<WhatsAppStatus>({
+      queryKey: ['/api/whatsapp/status'],
     });
 
   const [pixKeyInput, setPixKeyInput] = useState('');
@@ -889,6 +1211,89 @@ export default function DashboardFinanceiro() {
     await startMercadoPagoOAuth();
   };
 
+  const handleConnectWhatsApp = async () => {
+    if (isConnectingWhatsApp) return;
+
+    if (whatsappStatus?.configured === false) {
+      toast({
+        variant: 'destructive',
+        title: 'WhatsApp nao configurado',
+        description: 'Configure o app do Meta antes de conectar.',
+      });
+      return;
+    }
+
+    setIsConnectingWhatsApp(true);
+    try {
+      const configResponse = await apiRequest('GET', '/api/whatsapp/config');
+      const configData = (await configResponse.json()) as WhatsAppConfig;
+
+      if (!configResponse.ok || !configData?.configured) {
+        throw new Error('Configuracao do WhatsApp nao encontrada.');
+      }
+
+      if (!configData.appId || !configData.configId) {
+        throw new Error('App ID ou configuracao ausente.');
+      }
+
+      await loadFacebookSdk(
+        configData.appId,
+        configData.graphVersion || 'v21.0'
+      );
+
+      if (!window.FB) {
+        throw new Error('SDK do Facebook nao carregado.');
+      }
+
+      const loginResponse = await new Promise<FacebookLoginResponse>(
+        (resolve) => {
+          window.FB?.login(
+            (response) => resolve(response),
+            {
+              config_id: configData.configId,
+              response_type: 'code',
+              override_default_response_type: true,
+              scope: configData.scope,
+              redirect_uri: configData.redirectUri,
+            }
+          );
+        }
+      );
+
+      const code = loginResponse?.authResponse?.code;
+      if (!code) {
+        throw new Error('Autorizacao cancelada ou codigo ausente.');
+      }
+
+      const exchangeResponse = await apiRequest(
+        'POST',
+        '/api/whatsapp/embedded/exchange',
+        { code }
+      );
+      const exchangeData = await exchangeResponse.json();
+
+      if (!exchangeResponse.ok) {
+        throw new Error(
+          exchangeData?.message || 'Falha ao conectar o WhatsApp.'
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/status'] });
+      toast({
+        title: 'WhatsApp conectado',
+        description: 'Conta WhatsApp Business vinculada com sucesso.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao conectar WhatsApp',
+        description: error?.message || 'Tente novamente.',
+      });
+    } finally {
+      setIsConnectingWhatsApp(false);
+    }
+  };
+
   const handleKycSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const nextErrors = validateKycForm();
@@ -999,6 +1404,15 @@ export default function DashboardFinanceiro() {
     ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
     : 'bg-slate-100 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300';
   const canConnectMp = mercadoPagoStatus?.configured !== false;
+  const whatsappStatusLabel = isLoadingWhatsAppStatus
+    ? 'Verificando'
+    : whatsappStatus?.connected
+      ? 'Conectado'
+      : 'Desconectado';
+  const whatsappStatusBadgeClass = whatsappStatus?.connected
+    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400'
+    : 'bg-slate-100 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300';
+  const canConnectWhatsApp = whatsappStatus?.configured !== false;
 
   // Calcular datas baseado no período
   const dateRange = useMemo(() => {
@@ -1632,11 +2046,11 @@ export default function DashboardFinanceiro() {
             Credenciais do Mercado Pago nao configuradas no servidor.
           </div>
         )}
-        {canConnectMp &&
-          !mercadoPagoStatus?.connected &&
-          missingKycLabels.length > 0 && (
-            <div className='mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200'>
-              <div className='flex flex-wrap items-center gap-2'>
+      {canConnectMp &&
+        !mercadoPagoStatus?.connected &&
+        missingKycLabels.length > 0 && (
+          <div className='mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-200'>
+            <div className='flex flex-wrap items-center gap-2'>
                 <span className='font-medium'>Campos pendentes:</span>
                 {missingKycLabels.map((label) => (
                   <span
@@ -1646,15 +2060,64 @@ export default function DashboardFinanceiro() {
                     {label}
                   </span>
                 ))}
-              </div>
             </div>
-          )}
-      </Card>
+          </div>
+        )}
+    </Card>
 
-      <Card className='p-4 mb-6'>
-        <div className='flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
-          <div className='flex-1 space-y-2'>
-            <Label htmlFor='pix-key' className='text-sm font-semibold'>
+    <Card className='p-4 mb-6'>
+      <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+        <div className='flex items-start gap-3'>
+          <div className='flex h-11 w-11 items-center justify-center rounded-xl border bg-white text-emerald-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/60'>
+            <MessageCircle className='h-6 w-6' />
+          </div>
+          <div className='space-y-1'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <p className='text-base font-semibold'>WhatsApp Business</p>
+              <Badge className={whatsappStatusBadgeClass}>
+                {whatsappStatusLabel}
+              </Badge>
+            </div>
+            <p className='text-sm text-muted-foreground'>
+              Conecte seu numero para enviar cobrancas e notificacoes pelo
+              WhatsApp.
+            </p>
+            {whatsappStatus?.phoneNumber && (
+              <p className='text-xs text-muted-foreground'>
+                Numero conectado: {whatsappStatus.phoneNumber}
+              </p>
+            )}
+          </div>
+        </div>
+        <Button
+          onClick={handleConnectWhatsApp}
+          disabled={
+            isConnectingWhatsApp ||
+            isLoadingWhatsAppStatus ||
+            !canConnectWhatsApp
+          }
+          className='md:self-end'
+        >
+          {isConnectingWhatsApp ? (
+            <Loader2 className='h-4 w-4 animate-spin' />
+          ) : whatsappStatus?.connected ? (
+            'Reconectar'
+          ) : (
+            'Conectar'
+          )}
+        </Button>
+      </div>
+      {!isLoadingWhatsAppStatus && !canConnectWhatsApp && (
+        <div className='mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100'>
+          Credenciais do Meta nao configuradas no servidor.
+        </div>
+      )}
+    </Card>
+
+    <Card className='p-4 mb-6'>
+      <div className='flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
+        <div className='flex-1 space-y-2'>
+          <Label htmlFor='pix-key' className='text-sm font-semibold'>
               Chave PIX do recebimento
             </Label>
             <Input

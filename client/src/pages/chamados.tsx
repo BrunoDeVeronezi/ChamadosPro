@@ -1858,7 +1858,20 @@ export default function Chamados() {
         warranty?: string;
       };
     }) => {
-      return await apiRequest('POST', `/api/tickets/${id}/complete`, data);
+      try {
+        return await apiRequest('POST', `/api/tickets/${id}/complete`, data);
+      } catch (err: any) {
+        const message = typeof err?.message === 'string' ? err.message : '';
+        if (message.toLowerCase().includes('warranty')) {
+          const { warranty, ...payloadWithoutWarranty } = data;
+          return await apiRequest(
+            'POST',
+            `/api/tickets/${id}/complete`,
+            payloadWithoutWarranty
+          );
+        }
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tickets'] });

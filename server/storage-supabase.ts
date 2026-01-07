@@ -47,29 +47,41 @@ import { google } from 'googleapis';
 import { Readable } from 'stream';
 import { getUserRecord, upsertUserRecord } from './tokenStore';
 
-const isMissingPixColumnError = (error: any) => {
+const isMissingIntegrationSettingsColumnError = (error: any) => {
   if (!error || error.code !== 'PGRST204') return false;
   const message = String(error.message || '').toLowerCase();
   return (
     message.includes('pix_key') ||
     message.includes('pix_key_type') ||
-    message.includes('pix_account_holder')
+    message.includes('pix_account_holder') ||
+    message.includes('whatsapp_status') ||
+    message.includes('whatsapp_access_token') ||
+    message.includes('whatsapp_token_expires_at') ||
+    message.includes('whatsapp_business_account_id') ||
+    message.includes('whatsapp_phone_number_id') ||
+    message.includes('whatsapp_phone_number')
   );
 };
 
-const ensureIntegrationSettingsPixColumns = async () => {
+const ensureIntegrationSettingsColumns = async () => {
   try {
     await pool.query(`
       alter table integration_settings
         add column if not exists pix_key text,
         add column if not exists pix_key_type text,
-        add column if not exists pix_account_holder text;
+        add column if not exists pix_account_holder text,
+        add column if not exists whatsapp_status text default 'not_connected',
+        add column if not exists whatsapp_access_token text,
+        add column if not exists whatsapp_token_expires_at timestamp,
+        add column if not exists whatsapp_business_account_id text,
+        add column if not exists whatsapp_phone_number_id text,
+        add column if not exists whatsapp_phone_number text;
     `);
     await pool.query("notify pgrst, 'reload schema'");
     return true;
   } catch (error: any) {
     console.warn(
-      '[ensureIntegrationSettingsPixColumns] Failed to add pix columns:',
+      '[ensureIntegrationSettingsColumns] Failed to add integration columns:',
       error?.message || error
     );
     return false;
@@ -2393,8 +2405,8 @@ export class SupabaseStorage implements IStorage {
 
     if (error) {
       console.error('[createIntegrationSettings] Erro:', error);
-      if (isMissingPixColumnError(error)) {
-        const ensured = await ensureIntegrationSettingsPixColumns();
+      if (isMissingIntegrationSettingsColumnError(error)) {
+        const ensured = await ensureIntegrationSettingsColumns();
         if (ensured) {
           const retry = await supabase
             .from('integration_settings')
@@ -2432,8 +2444,8 @@ export class SupabaseStorage implements IStorage {
 
     if (error) {
       console.error('[updateIntegrationSettings] Erro:', error);
-      if (isMissingPixColumnError(error)) {
-        const ensured = await ensureIntegrationSettingsPixColumns();
+      if (isMissingIntegrationSettingsColumnError(error)) {
+        const ensured = await ensureIntegrationSettingsColumns();
         if (ensured) {
           const retry = await supabase
             .from('integration_settings')

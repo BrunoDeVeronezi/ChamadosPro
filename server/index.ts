@@ -36,12 +36,18 @@ const ensureIntegrationSettingsColumns = async () => {
       alter table integration_settings
         add column if not exists pix_key text,
         add column if not exists pix_key_type text,
-        add column if not exists pix_account_holder text;
+        add column if not exists pix_account_holder text,
+        add column if not exists whatsapp_status text default 'not_connected',
+        add column if not exists whatsapp_access_token text,
+        add column if not exists whatsapp_token_expires_at timestamp,
+        add column if not exists whatsapp_business_account_id text,
+        add column if not exists whatsapp_phone_number_id text,
+        add column if not exists whatsapp_phone_number text;
     `);
     await pool.query("notify pgrst, 'reload schema'");
   } catch (error: any) {
     console.warn(
-      '[ensureIntegrationSettingsColumns] Failed to ensure pix columns:',
+      '[ensureIntegrationSettingsColumns] Failed to ensure integration columns:',
       error?.message || error
     );
   }

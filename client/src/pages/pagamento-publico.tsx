@@ -6,9 +6,10 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/masks';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Copy, Loader2, Share2 } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -60,12 +61,17 @@ export default function PagamentoPublico() {
   const brickControllerRef = useRef<any>(null);
   const payerEmailRef = useRef('');
   const payerDocumentRef = useRef('');
+  const pixRequestKeyRef = useRef('');
   const [sdkReady, setSdkReady] = useState(false);
   const [payerEmail, setPayerEmail] = useState('');
   const [payerDocument, setPayerDocument] = useState('');
   const [brickError, setBrickError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [selectedMethod, setSelectedMethod] = useState<'pix' | 'card'>('pix');
+  const [pixResult, setPixResult] = useState<any>(null);
+  const [pixError, setPixError] = useState<string | null>(null);
+  const [isGeneratingPix, setIsGeneratingPix] = useState(false);
+  const [isSharingPix, setIsSharingPix] = useState(false);
 
   const { data, isLoading } = useQuery<PublicPaymentInfo>({
     queryKey: ['/api/public/payment-links', token],
@@ -97,13 +103,18 @@ export default function PagamentoPublico() {
 
   useEffect(() => {
     if (!data?.mercadoPago?.connected || !data?.mercadoPago?.publicKey) return;
+    if (selectedMethod !== 'card') return;
     loadMercadoPagoSdk()
       .then(() => setSdkReady(true))
       .catch((error) => {
         console.error(error);
         setBrickError('Nao foi possivel carregar o Mercado Pago.');
       });
-  }, [data?.mercadoPago?.connected, data?.mercadoPago?.publicKey]);
+  }, [
+    data?.mercadoPago?.connected,
+    data?.mercadoPago?.publicKey,
+    selectedMethod,
+  ]);
 
   useEffect(() => {
     if (
@@ -114,6 +125,9 @@ export default function PagamentoPublico() {
       return;
     }
     if (data.recordStatus === 'paid') {
+      return;
+    }
+    if (selectedMethod !== 'card') {
       return;
     }
 
@@ -145,7 +159,7 @@ export default function PagamentoPublico() {
               paymentMethods: {
                 creditCard: 'all',
                 debitCard: 'all',
-                bankTransfer: ['pix'],
+                bankTransfer: [],
               },
             },
             callbacks: {
@@ -172,7 +186,9 @@ export default function PagamentoPublico() {
                   .then((response) => response.json())
                   .then((responseData) => {
                     if (isCancelled) return;
-                    setPaymentResult(responseData);
+                    if (responseData?.pixPayload || responseData?.qrCodeDataUrl) {
+                      setPixResult(responseData);
+                    }
                     if (
                       responseData?.status === 'approved' ||
                       responseData?.status === 'accredited'
@@ -234,6 +250,65 @@ export default function PagamentoPublico() {
     data?.recordStatus,
     toast,
     token,
+    selectedMethod,
+  ]);
+
+  useEffect(() => {
+    if (selectedMethod !== 'pix') return;
+    if (!data?.mercadoPago?.connected) return;
+    if (data.recordStatus === 'paid') return;
+    const currentEmail = payerEmailRef.current.trim();
+    const rawDocument = payerDocumentRef.current.trim();
+    const currentDocument = rawDocument.replace(/\D/g, '');
+    if (!currentEmail || !currentEmail.includes('@')) return;
+    if (![11, 14].includes(currentDocument.length)) return;
+    if (isGeneratingPix) return;
+    const requestKey = `${currentEmail}|${currentDocument}`;
+    if (pixRequestKeyRef.current === requestKey && pixResult?.pixPayload) {
+      return;
+    }
+    pixRequestKeyRef.current = requestKey;
+    setIsGeneratingPix(true);
+    setPixError(null);
+
+    apiRequest(
+      'POST',
+      `/api/public/payment-links/${token}/mercadopago`,
+      {
+        formData: {
+          payment_method_id: 'pix',
+          email: currentEmail,
+          document: currentDocument,
+        },
+      }
+    )
+      .then((response) => response.json())
+      .then((responseData) => {
+        setPixResult(responseData);
+        if (responseData?.status === 'approved') {
+          toast({
+            title: 'Pagamento aprovado',
+            description: 'Obrigado! Seu pagamento foi confirmado.',
+          });
+        }
+      })
+      .catch((error: any) => {
+        pixRequestKeyRef.current = '';
+        setPixError(error?.message || 'Nao foi possivel gerar o PIX.');
+      })
+      .finally(() => {
+        setIsGeneratingPix(false);
+      });
+  }, [
+    selectedMethod,
+    data?.mercadoPago?.connected,
+    data?.recordStatus,
+    payerEmail,
+    payerDocument,
+    isGeneratingPix,
+    pixResult?.pixPayload,
+    toast,
+    token,
   ]);
 
   if (isLoading) {
@@ -258,6 +333,74 @@ export default function PagamentoPublico() {
 
   const alreadyPaid = data.recordStatus === 'paid';
   const showBrick = data.mercadoPago?.connected && !alreadyPaid;
+  const pixPayload = pixResult?.pixPayload || '';
+  const qrCodeDataUrl = pixResult?.qrCodeDataUrl || '';
+  const hasPixResult = Boolean(pixPayload || qrCodeDataUrl);
+
+  const copyPixPayload = async () => {
+    if (!pixPayload) return;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(pixPayload);
+      toast({
+        title: 'PIX copiado',
+        description: 'Cole o codigo no app do banco.',
+      });
+      return;
+    }
+    window.prompt('Copie o codigo PIX:', pixPayload);
+  };
+
+  const sharePixPayload = async () => {
+    if (!pixPayload) return;
+    if (!navigator.share) {
+      await copyPixPayload();
+      return;
+    }
+    setIsSharingPix(true);
+    try {
+      const shareData: ShareData = {
+        title: 'Pagamento PIX',
+        text: `PIX copia e cola:\n${pixPayload}`,
+      };
+      if (qrCodeDataUrl) {
+        const response = await fetch(qrCodeDataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'pix-qrcode.png', {
+          type: blob.type || 'image/png',
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          shareData.files = [file];
+        }
+      }
+      await navigator.share(shareData);
+    } finally {
+      setIsSharingPix(false);
+    }
+  };
+
+  const sendPixByEmail = () => {
+    const currentEmail = payerEmailRef.current.trim();
+    if (!currentEmail) {
+      toast({
+        title: 'Email obrigatorio',
+        description: 'Informe um email valido para enviar.',
+      });
+      return;
+    }
+    const subject = encodeURIComponent(
+      `Pagamento PIX - ${data.company?.name || 'ChamadosPro'}`
+    );
+    const bodyLines = [
+      `Ola, segue o PIX para pagamento.`,
+      '',
+      `Codigo copia e cola:`,
+      pixPayload || '(ainda nao gerado)',
+      '',
+      `Link de pagamento: ${window.location.href}`,
+    ];
+    const body = encodeURIComponent(bodyLines.join('\n'));
+    window.location.href = `mailto:${currentEmail}?subject=${subject}&body=${body}`;
+  };
 
   return (
     <div className='min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-10'>
@@ -322,11 +465,41 @@ export default function PagamentoPublico() {
         </Card>
 
         {showBrick && (
-          <Card className='p-6 space-y-4'>
+          <Card className='p-6 space-y-4 overflow-hidden'>
             <h2 className='text-base font-semibold text-slate-900 dark:text-slate-100'>
               Escolha como pagar
             </h2>
-            <div className='grid gap-4 md:grid-cols-2'>
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <button
+                type='button'
+                onClick={() => setSelectedMethod('card')}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  selectedMethod === 'card'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200'
+                }`}
+              >
+                <p className='text-sm font-semibold'>Cartao</p>
+                <p className='text-xs text-slate-500'>
+                  Credito ou debito, com confirmacao imediata.
+                </p>
+              </button>
+              <button
+                type='button'
+                onClick={() => setSelectedMethod('pix')}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  selectedMethod === 'pix'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200'
+                }`}
+              >
+                <p className='text-sm font-semibold'>PIX</p>
+                <p className='text-xs text-slate-500'>
+                  QR Code e copia e cola na hora.
+                </p>
+              </button>
+            </div>
+            <div className='grid gap-4 sm:grid-cols-2'>
               <div className='space-y-2'>
                 <Label htmlFor='payer-email'>Email do pagador</Label>
                 <Input
@@ -347,44 +520,111 @@ export default function PagamentoPublico() {
               </div>
             </div>
 
-            {brickError && (
+            {selectedMethod === 'card' && brickError && (
               <div className='rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
                 {brickError}
               </div>
             )}
 
-            {isSubmitting && (
+            {selectedMethod === 'card' && isSubmitting && (
               <div className='flex items-center gap-2 text-sm text-slate-500'>
                 <Loader2 className='h-4 w-4 animate-spin' />
                 Processando pagamento...
               </div>
             )}
 
-            <div id='paymentBrick_container' />
+            {selectedMethod === 'card' && (
+              <div id='paymentBrick_container' className='w-full min-w-0' />
+            )}
 
-            {paymentResult?.qrCodeDataUrl && (
-              <div className='rounded-lg border border-slate-200 p-4 text-center'>
-                <p className='text-sm font-medium text-slate-700'>
-                  QR Code PIX
-                </p>
-                <img
-                  src={paymentResult.qrCodeDataUrl}
-                  alt='QR Code PIX'
-                  className='mx-auto mt-3 h-48 w-48'
-                />
-                {paymentResult.pixPayload && (
-                  <Button
-                    className='mt-3'
-                    variant='outline'
-                    onClick={() =>
-                      navigator.clipboard.writeText(
-                        paymentResult.pixPayload || ''
-                      )
-                    }
-                  >
-                    Copiar codigo PIX
-                  </Button>
+            {selectedMethod === 'pix' && (
+              <div className='space-y-3'>
+                {!hasPixResult && !isGeneratingPix && (
+                  <div className='rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600'>
+                    Preencha email e CPF/CNPJ para gerar o PIX automaticamente.
+                  </div>
                 )}
+                {pixError && (
+                  <div className='rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
+                    {pixError}
+                  </div>
+                )}
+                {isGeneratingPix && (
+                  <div className='flex items-center gap-2 text-sm text-slate-500'>
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                    Gerando PIX...
+                  </div>
+                )}
+                {hasPixResult && (
+                  <div className='flex justify-end'>
+                    <Button
+                      type='button'
+                      size='sm'
+                      variant='outline'
+                      onClick={sendPixByEmail}
+                    >
+                      Enviar por email
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedMethod === 'pix' && hasPixResult && (
+              <div className='rounded-lg border border-slate-200 p-4'>
+                <div className='grid gap-4 md:grid-cols-[1fr_auto] md:items-start'>
+                  <div className='space-y-3'>
+                    <p className='text-sm font-medium text-slate-700'>
+                      PIX copia e cola
+                    </p>
+                    <Textarea
+                      value={pixPayload}
+                      readOnly
+                      className='min-h-[96px] resize-none text-xs leading-5'
+                    />
+                    <div className='flex flex-wrap gap-2'>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={copyPixPayload}
+                        className='gap-2'
+                      >
+                        <Copy className='h-4 w-4' />
+                        Copiar PIX
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={sharePixPayload}
+                        disabled={isSharingPix}
+                        className='gap-2'
+                      >
+                        {isSharingPix ? (
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <Share2 className='h-4 w-4' />
+                        )}
+                        Compartilhar
+                      </Button>
+                    </div>
+                    <p className='text-xs text-slate-500'>
+                      No celular, toque em Compartilhar para abrir o app do
+                      banco, se estiver disponivel.
+                    </p>
+                  </div>
+                  {qrCodeDataUrl && (
+                    <div className='text-center'>
+                      <p className='text-sm font-medium text-slate-700'>
+                        QR Code PIX
+                      </p>
+                      <img
+                        src={qrCodeDataUrl}
+                        alt='QR Code PIX'
+                        className='mx-auto mt-3 h-40 w-40'
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </Card>
